@@ -259,6 +259,8 @@
       font-weight: 500;
     }
 
+    .score-upcoming { color: var(--muted) !important; }
+
     .score-placeholder {
       font-size: 1rem;
       font-weight: 600;
@@ -647,8 +649,51 @@ function computeResult(pronoStr, scoreA, scoreB, status) {
 }
 
 // ── Formatage heure locale ─────────────────────────────────────
+// Tente de parser une date dans n'importe quel format courant
+// (ISO, DD/MM/YYYY HH:MM, DD/MM/YYYY, etc.)
+function parseDate(str) {
+  if (!str) return null;
+  str = str.trim();
+  // ISO standard → direct
+  let d = new Date(str);
+  if (!isNaN(d)) return d;
+  // DD/MM/YYYY HH:MM ou DD/MM/YYYY HH:MM:SS
+  let m = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+  if (m) {
+    d = new Date(
+      parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]),
+      parseInt(m[4] || 0), parseInt(m[5] || 0), parseInt(m[6] || 0)
+    );
+    if (!isNaN(d)) return d;
+  }
+  // MM/DD/YYYY (format américain)
+  m = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/);
+  if (m) {
+    d = new Date(parseInt(m[3]), parseInt(m[1]) - 1, parseInt(m[2]));
+    if (!isNaN(d)) return d;
+  }
+  // DD/MM HHhMM ou DD/MM HH:MM (sans année — on suppose l'année courante)
+  // ex: "16/06 21h", "16/06 21h00", "16/06 21:00"
+  m = str.match(/(\d{1,2})[\/](\d{1,2})\s*(\d{1,2})[h:](\d{0,2})/);
+  if (m) {
+    const year = new Date().getFullYear();
+    d = new Date(year, parseInt(m[2]) - 1, parseInt(m[1]),
+      parseInt(m[3]), parseInt(m[4] || 0));
+    if (!isNaN(d)) return d;
+  }
+  // DD/MM sans heure
+  m = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})$/);
+  if (m) {
+    const year = new Date().getFullYear();
+    d = new Date(year, parseInt(m[2]) - 1, parseInt(m[1]));
+    if (!isNaN(d)) return d;
+  }
+  return null;
+}
+
 function formatTime(utcStr) {
-  const d = new Date(utcStr);
+  const d = parseDate(utcStr);
+  if (!d) return "--:--";
   return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 }
 
@@ -678,7 +723,7 @@ function renderMatchCard(match, matchPronos, matchsSheet, sheetMatchID, i) {
   const realStatus = status || (sheetScoreA !== null ? "FINISHED" : "TIMED");
 
   const now = new Date();
-  const kickoff = new Date(utcDate);
+  const kickoff = parseDate(utcDate) || new Date(utcDate);
   const started = now >= kickoff;
 
   // Statut badge
@@ -693,7 +738,11 @@ function renderMatchCard(match, matchPronos, matchsSheet, sheetMatchID, i) {
     scoreHTML = `<div class="score-digits">${realScoreA ?? "?"}<span class="score-sep"> - </span>${realScoreB ?? "?"}</div>`;
     if (realStatus !== "FINISHED") scoreHTML += `<div class="score-time">Live</div>`;
   } else {
-    scoreHTML = `<div class="score-placeholder">${formatTime(utcDate)}</div>`;
+    // Avant le match : 0 - 0 grisé + heure de coup d'envoi
+    const timeStr = formatTime(utcDate);
+    scoreHTML = `
+      <div class="score-digits score-upcoming">0<span class="score-sep"> - </span>0</div>
+      <div class="score-time">coup d'envoi ${timeStr}</div>`;
   }
 
   // Pronostics section
