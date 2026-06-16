@@ -780,7 +780,7 @@ function renderRanking(matchsSheet, pronosData, apiMatches) {
   );
 
   if (sorted.length === 0) {
-    return `<div class="state-block"><div class="state-icon">📊</div><p>Le classement apparaîtra une fois les premiers matchs terminés.</p></div>`;
+    return `<div class="state-block"><div class="state-icon">📊</div><p>Aucun joueur détecté dans le Google Sheets.</p></div>`;
   }
 
   const medals = ["🥇","🥈","🥉"];
