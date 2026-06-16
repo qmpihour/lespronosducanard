@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pronostics Coupe du Monde 2026</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* ─── RESET & BASE ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #0d0d1a;
+      --surface:     #12122a;
+      --card:        #181836;
+      --card-hover:  #1e1e42;
+      --accent:      #e94560;
+      --accent-soft: rgba(233,69,96,0.15);
+      --accent2:     #4f8ef7;
+      --gold:        #f5c518;
+      --silver:      #c0c0c0;
+      --bronze:      #cd7f32;
+      --text:        #f0f0fa;
+      --muted:       #7070a0;
+      --border:      rgba(255,255,255,0.07);
+      --radius:      12px;
+      --radius-lg:   18px;
+      --font:        'Inter', system-ui, sans-serif;
+      --transition:  0.2s ease;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── HEADER ────────────────────────────────────────────────── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 1rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(12px);
+    }
+
+    .header-inner {
+      max-width: 900px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      font-size: 1.1rem;
+      letter-spacing: -0.02em;
+      text-decoration: none;
+      color: var(--text);
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+
+    .logo span { color: var(--accent); }
+
+    /* ─── TABS NAV ──────────────────────────────────────────────── */
+    .tabs-nav {
+      display: flex;
+      gap: 4px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 8px;
+      padding: 3px;
+    }
+
+    .tab-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      font: 500 0.8rem var(--font);
+      padding: 5px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: var(--transition);
+      white-space: nowrap;
+    }
+
+    .tab-btn.active {
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .tab-btn:hover:not(.active) {
+      color: var(--text);
+      background: rgba(255,255,255,0.06);
+    }
+
+    /* ─── MAIN LAYOUT ───────────────────────────────────────────── */
+    main {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 1.5rem 1rem 4rem;
+    }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ─── SECTION TITLE ─────────────────────────────────────────── */
+    .section-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 1rem;
+      padding-left: 2px;
+    }
+
+    /* ─── MATCH CARD ────────────────────────────────────────────── */
+    .match-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      margin-bottom: 1rem;
+      overflow: hidden;
+      animation: fadeUp 0.35s ease both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .match-card:nth-child(2) { animation-delay: 0.05s; }
+    .match-card:nth-child(3) { animation-delay: 0.10s; }
+    .match-card:nth-child(4) { animation-delay: 0.15s; }
+    .match-card:nth-child(5) { animation-delay: 0.20s; }
+
+    .card-header {
+      padding: 1rem 1.25rem 0.75rem;
+    }
+
+    .match-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.75rem;
+    }
+
+    .match-group {
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .match-status {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 20px;
+      letter-spacing: 0.04em;
+    }
+
+    .status-upcoming {
+      background: rgba(79,142,247,0.15);
+      color: var(--accent2);
+    }
+
+    .status-live {
+      background: rgba(233,69,96,0.18);
+      color: var(--accent);
+      animation: pulse 1.6s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.55; }
+    }
+
+    .status-finished {
+      background: rgba(255,255,255,0.06);
+      color: var(--muted);
+    }
+
+    /* ─── TEAMS ROW ─────────────────────────────────────────────── */
+    .teams-row {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .team {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      text-align: center;
+    }
+
+    .team-flag { font-size: 2.4rem; line-height: 1; }
+
+    .team-name {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .score-block {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .score-digits {
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      color: var(--text);
+      line-height: 1;
+    }
+
+    .score-sep {
+      color: var(--muted);
+      font-weight: 300;
+      padding: 0 1px;
+    }
+
+    .score-time {
+      font-size: 0.65rem;
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    .score-placeholder {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--muted);
+      padding: 0.4rem 0;
+    }
+
+    /* ─── PRONOS TABLE ──────────────────────────────────────────── */
+    .pronos-section {
+      border-top: 1px solid var(--border);
+      padding: 0.75rem 1.25rem 1rem;
+    }
+
+    .pronos-title {
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 0.6rem;
+    }
+
+    .pronos-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 6px;
+    }
+
+    .prono-chip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 0.78rem;
+      transition: var(--transition);
+    }
+
+    .prono-chip:hover { background: rgba(255,255,255,0.07); }
+
+    .prono-name {
+      font-weight: 500;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 70px;
+    }
+
+    .prono-right {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-shrink: 0;
+    }
+
+    .prono-score {
+      font-weight: 700;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .prono-result { font-size: 1rem; }
+
+    .hidden-prono {
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-style: italic;
+      padding: 0.4rem 0 0;
+    }
+
+    /* ─── CLASSEMENT ────────────────────────────────────────────── */
+    .ranking-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0 6px;
+    }
+
+    .ranking-table th {
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      padding: 0 0.75rem 0.5rem;
+      text-align: left;
+    }
+
+    .ranking-table th:not(:first-child) { text-align: center; }
+
+    .ranking-table td {
+      padding: 0.7rem 0.75rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      transition: var(--transition);
+    }
+
+    .ranking-table td:first-child {
+      border-radius: var(--radius) 0 0 var(--radius);
+      border-right: none;
+    }
+
+    .ranking-table td:last-child {
+      border-radius: 0 var(--radius) var(--radius) 0;
+      border-left: none;
+      text-align: center;
+    }
+
+    .ranking-table td:not(:first-child):not(:last-child) {
+      border-left: none;
+      border-right: none;
+      text-align: center;
+    }
+
+    .ranking-table tbody tr:hover td { background: var(--card-hover); }
+
+    .rank-cell {
+      font-size: 1.1rem;
+      font-weight: 800;
+      width: 44px;
+    }
+
+    .rank-number {
+      display: inline-block;
+      width: 26px;
+      text-align: center;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    .player-name {
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .pts-cell {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--accent);
+    }
+
+    .stat-cell {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--muted);
+    }
+
+    .podium-1 .player-name { color: var(--gold); }
+    .podium-2 .player-name { color: var(--silver); }
+    .podium-3 .player-name { color: var(--bronze); }
+
+    /* ─── LOADING / ERROR ───────────────────────────────────────── */
+    .state-block {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 1rem;
+      color: var(--muted);
+      gap: 0.75rem;
+      text-align: center;
+    }
+
+    .state-icon { font-size: 2.5rem; }
+
+    .state-block p { font-size: 0.9rem; line-height: 1.6; max-width: 340px; }
+
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid rgba(233,69,96,0.2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── FOOTER ────────────────────────────────────────────────── */
+    .footer {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 0.5rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      font-size: 0.7rem;
+      color: var(--muted);
+      z-index: 50;
+    }
+
+    .refresh-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent2);
+      flex-shrink: 0;
+    }
+
+    .refresh-dot.refreshing { background: var(--accent); animation: pulse 0.8s infinite; }
+
+    /* ─── RESPONSIVE ────────────────────────────────────────────── */
+    @media (max-width: 480px) {
+      .team-flag { font-size: 1.8rem; }
+      .score-digits { font-size: 1.7rem; }
+      .team-name { font-size: 0.72rem; }
+      .pronos-grid { grid-template-columns: repeat(2, 1fr); }
+      .ranking-table th, .ranking-table td { padding: 0.55rem 0.5rem; font-size: 0.8rem; }
+      .pts-cell { font-size: 0.95rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <a class="logo" href="#">
+      <div class="logo-icon">⚽</div>
+      <span>Pronos</span>&nbsp;2026
+    </a>
+    <nav class="tabs-nav" role="tablist">
+      <button class="tab-btn active" role="tab" data-tab="matchs">Matchs du jour</button>
+      <button class="tab-btn" role="tab" data-tab="classement">Classement</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div id="tab-matchs" class="tab-panel active">
+    <p class="section-title" id="matchs-date">Chargement…</p>
+    <div id="matchs-container">
+      <div class="state-block"><div class="spinner"></div><p>Récupération des matchs…</p></div>
+    </div>
+  </div>
+
+  <div id="tab-classement" class="tab-panel">
+    <p class="section-title">Classement général</p>
+    <div id="ranking-container">
+      <div class="state-block"><div class="spinner"></div><p>Calcul du classement…</p></div>
+    </div>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="refresh-dot" id="refresh-dot"></div>
+  <span id="last-update">En attente de données…</span>
+</footer>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   ⚙️ CONFIGURATION — à modifier avant déploiement
+   ═══════════════════════════════════════════════════════════════ */
+const FOOTBALL_API_KEY  = "833c98f22beb43e783975a448ac5b3e7";
+const SHEET_MATCHS_URL  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT7-6Ao0BMuT1OP_HII2trYSIimF5tMaMPq6fEHZQ3_hojeyzGqi-ULjE5zgz3xaXOA_E4PDKcn3TJv/pub?gid=0&single=true&output=csv";
+const SHEET_PRONOS_URL  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT7-6Ao0BMuT1OP_HII2trYSIimF5tMaMPq6fEHZQ3_hojeyzGqi-ULjE5zgz3xaXOA_E4PDKcn3TJv/pub?gid=281674232&single=true&output=csv";
+/* ═══════════════════════════════════════════════════════════════ */
+
+const REFRESH_INTERVAL = 60_000; // ms
+
+// ── Correspondances noms pays → emoji drapeau ──────────────────
+const FLAG_MAP = {
+  "Argentina":"🇦🇷","Australia":"🇦🇺","Belgium":"🇧🇪","Brazil":"🇧🇷",
+  "Cameroon":"🇨🇲","Canada":"🇨🇦","Chile":"🇨🇱","Colombia":"🇨🇴",
+  "Costa Rica":"🇨🇷","Croatia":"🇭🇷","Denmark":"🇩🇰","Ecuador":"🇪🇨",
+  "England":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","France":"🇫🇷","Germany":"🇩🇪","Ghana":"🇬🇭",
+  "Iran":"🇮🇷","Japan":"🇯🇵","Mexico":"🇲🇽","Morocco":"🇲🇦",
+  "Netherlands":"🇳🇱","Nigeria":"🇳🇬","Poland":"🇵🇱","Portugal":"🇵🇹",
+  "Qatar":"🇶🇦","Saudi Arabia":"🇸🇦","Senegal":"🇸🇳","Serbia":"🇷🇸",
+  "South Korea":"🇰🇷","Spain":"🇪🇸","Switzerland":"🇨🇭","Tunisia":"🇹🇳",
+  "United States":"🇺🇸","Uruguay":"🇺🇾","Wales":"🏴󠁧󠁢󠁷󠁬󠁳󠁿","Ecuador":"🇪🇨",
+  "USA":"🇺🇸","Korea Republic":"🇰🇷","IR Iran":"🇮🇷","Côte d'Ivoire":"🇨🇮",
+  "Ivory Coast":"🇨🇮","Algeria":"🇩🇿","Egypt":"🇪🇬","Mali":"🇲🇱",
+  "Venezuela":"🇻🇪","Paraguay":"🇵🇾","Bolivia":"🇧🇴","Peru":"🇵🇪",
+  "Honduras":"🇭🇳","Panama":"🇵🇦","Jamaica":"🇯🇲","New Zealand":"🇳🇿",
+  "Indonesia":"🇮🇩","Thailand":"🇹🇭","Iraq":"🇮🇶","Türkiye":"🇹🇷",
+  "Turkey":"🇹🇷","Scotland":"🏴󠁧󠁢󠁳󠁣󠁴󠁿","Austria":"🇦🇹","Czech Republic":"🇨🇿",
+  "Slovakia":"🇸🇰","Hungary":"🇭🇺","Slovenia":"🇸🇮","Ukraine":"🇺🇦",
+  "Albania":"🇦🇱","Romania":"🇷🇴","Greece":"🇬🇷","Sweden":"🇸🇪",
+  "Norway":"🇳🇴","Finland":"🇫🇮","Russia":"🇷🇺","China PR":"🇨🇳","China":"🇨🇳",
+  "India":"🇮🇳","Uzbekistan":"🇺🇿","Congo DR":"🇨🇩","Zimbabwe":"🇿🇼",
+  "Zambia":"🇿🇲","Tanzania":"🇹🇿","Rwanda":"🇷🇼","South Africa":"🇿🇦",
+  "Kenya":"🇰🇪","Angola":"🇦🇴","Mozambique":"🇲🇿","Ethiopia":"🇪🇹",
+  "Burkina Faso":"🇧🇫","Guinea":"🇬🇳","Namibia":"🇳🇦","Tanzania":"🇹🇿",
+};
+
+function getFlag(name) {
+  return FLAG_MAP[name] || "🏳️";
+}
+
+// ── Parsing CSV basique ────────────────────────────────────────
+function parseCSV(text) {
+  const lines = text.trim().split("\n");
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, ""));
+  return lines.slice(1).map(line => {
+    const cells = [];
+    let cur = "", inQ = false;
+    for (const ch of line) {
+      if (ch === '"') { inQ = !inQ; continue; }
+      if (ch === "," && !inQ) { cells.push(cur.trim()); cur = ""; }
+      else cur += ch;
+    }
+    cells.push(cur.trim());
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = (cells[i] || "").trim());
+    return obj;
+  });
+}
+
+// ── Fetch CSV via allorigins (CORS proxy public) ───────────────
+async function fetchCSV(url) {
+  const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+  const res = await fetch(proxy);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return parseCSV(await res.text());
+}
+
+// ── Fetch API football-data.org ────────────────────────────────
+async function fetchAPIMatches() {
+  const today = new Date().toISOString().split("T")[0];
+  const url = `https://api.football-data.org/v4/competitions/WC/matches?dateFrom=${today}&dateTo=${today}&stage=GROUP_STAGE`;
+  const res = await fetch(url, {
+    headers: { "X-Auth-Token": FOOTBALL_API_KEY }
+  });
+  if (!res.ok) throw new Error(`API football-data: HTTP ${res.status}`);
+  const data = await res.json();
+  return data.matches || [];
+}
+
+// ── Calcul résultat d'un pronostic ────────────────────────────
+function computeResult(pronoStr, scoreA, scoreB, status) {
+  if (status !== "FINISHED" && status !== "IN_PLAY" && status !== "PAUSED") return null;
+  if (scoreA === null || scoreB === null) return null;
+  const parts = pronoStr.split("-");
+  if (parts.length !== 2) return null;
+  const pA = parseInt(parts[0]), pB = parseInt(parts[1]);
+  if (isNaN(pA) || isNaN(pB)) return null;
+
+  if (pA === scoreA && pB === scoreB) return { pts: 2, icon: "✅", label: "2pts" };
+
+  const realWinner = scoreA > scoreB ? "A" : scoreB > scoreA ? "B" : "N";
+  const pronoWinner = pA > pB ? "A" : pB > pA ? "B" : "N";
+  if (realWinner === pronoWinner) return { pts: 1, icon: "🟡", label: "1pt" };
+
+  return { pts: 0, icon: "❌", label: "0pt" };
+}
+
+// ── Formatage heure locale ─────────────────────────────────────
+function formatTime(utcStr) {
+  const d = new Date(utcStr);
+  return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+}
+
+function todayLabel() {
+  return new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+}
+
+// ── Rendu d'une carte match ───────────────────────────────────
+function renderMatchCard(match, pronos, matchsSheet, i) {
+  const { id, homeTeam, awayTeam, utcDate, status, score } = match;
+  const teamA = homeTeam.name;
+  const teamB = awayTeam.name;
+  const flagA = getFlag(teamA);
+  const flagB = getFlag(teamB);
+  const scoreA = score?.fullTime?.home ?? score?.regularTime?.home ?? null;
+  const scoreB = score?.fullTime?.away ?? score?.regularTime?.away ?? null;
+
+  // Cherche le MatchID dans le sheet Matchs via nom d'équipes
+  const sheetRow = matchsSheet.find(r =>
+    r["Équipe A"]?.toLowerCase() === teamA.toLowerCase() &&
+    r["Équipe B"]?.toLowerCase() === teamB.toLowerCase()
+  ) || matchsSheet.find(r =>
+    r["Équipe A"]?.toLowerCase().includes(teamA.split(" ")[0].toLowerCase()) &&
+    r["Équipe B"]?.toLowerCase().includes(teamB.split(" ")[0].toLowerCase())
+  );
+  const sheetMatchID = sheetRow?.MatchID || String(id);
+
+  // Score dans le sheet (si rempli manuellement)
+  const sheetScoreA = sheetRow?.["Score A"] !== undefined && sheetRow["Score A"] !== "" ? parseInt(sheetRow["Score A"]) : null;
+  const sheetScoreB = sheetRow?.["Score B"] !== undefined && sheetRow["Score B"] !== "" ? parseInt(sheetRow["Score B"]) : null;
+
+  // Priorité : score API, sinon sheet
+  const realScoreA = scoreA !== null ? scoreA : sheetScoreA;
+  const realScoreB = scoreB !== null ? scoreB : sheetScoreB;
+  const realStatus = status || (sheetScoreA !== null ? "FINISHED" : "TIMED");
+
+  // Pronostics pour ce match
+  const matchPronos = pronos.filter(p =>
+    p.MatchID === sheetMatchID || p.MatchID === String(id)
+  );
+
+  const now = new Date();
+  const kickoff = new Date(utcDate);
+  const started = now >= kickoff;
+
+  // Statut badge
+  let statusLabel, statusClass;
+  if (realStatus === "FINISHED") { statusLabel = "Terminé"; statusClass = "status-finished"; }
+  else if (realStatus === "IN_PLAY" || realStatus === "PAUSED") { statusLabel = "🔴 En cours"; statusClass = "status-live"; }
+  else { statusLabel = `⏰ ${formatTime(utcDate)}`; statusClass = "status-upcoming"; }
+
+  // Score ou placeholder
+  let scoreHTML;
+  if (realStatus === "FINISHED" || realStatus === "IN_PLAY" || realStatus === "PAUSED") {
+    scoreHTML = `<div class="score-digits">${realScoreA ?? "?"}<span class="score-sep"> - </span>${realScoreB ?? "?"}</div>`;
+    if (realStatus !== "FINISHED") scoreHTML += `<div class="score-time">Live</div>`;
+  } else {
+    scoreHTML = `<div class="score-placeholder">${formatTime(utcDate)}</div>`;
+  }
+
+  // Pronostics section
+  let pronosHTML = "";
+  if (matchPronos.length > 0) {
+    if (!started) {
+      pronosHTML = `<p class="hidden-prono">🔒 Pronostics révélés au coup d'envoi</p>`;
+    } else {
+      const chips = matchPronos.map(p => {
+        const res = computeResult(p.Pronostic, realScoreA, realScoreB, realStatus);
+        return `
+          <div class="prono-chip">
+            <span class="prono-name">${escHtml(p.Joueur)}</span>
+            <span class="prono-right">
+              <span class="prono-score">${escHtml(p.Pronostic)}</span>
+              ${res ? `<span class="prono-result" title="${res.label}">${res.icon}</span>` : ""}
+            </span>
+          </div>`;
+      }).join("");
+      pronosHTML = `<div class="pronos-grid">${chips}</div>`;
+    }
+  }
+
+  const group = match.group ? `Groupe ${match.group.replace("GROUP_","").replace("_"," ")}` : "Poules";
+  const delay = `animation-delay: ${i * 0.06}s`;
+
+  return `
+  <div class="match-card" style="${delay}">
+    <div class="card-header">
+      <div class="match-meta">
+        <span class="match-group">${escHtml(group)}</span>
+        <span class="match-status ${statusClass}">${statusLabel}</span>
+      </div>
+      <div class="teams-row">
+        <div class="team">
+          <div class="team-flag">${flagA}</div>
+          <div class="team-name">${escHtml(teamA)}</div>
+        </div>
+        <div class="score-block">${scoreHTML}</div>
+        <div class="team">
+          <div class="team-flag">${flagB}</div>
+          <div class="team-name">${escHtml(teamB)}</div>
+        </div>
+      </div>
+    </div>
+    ${matchPronos.length > 0 ? `
+    <div class="pronos-section">
+      <p class="pronos-title">Pronostics</p>
+      ${pronosHTML}
+    </div>` : ""}
+  </div>`;
+}
+
+// ── Rendu classement ──────────────────────────────────────────
+function renderRanking(matchsSheet, pronos, apiMatches) {
+  const scores = {};
+
+  // Rassemble tous les matchs terminés
+  const finishedMatches = [];
+  for (const m of apiMatches) {
+    if (m.status !== "FINISHED") continue;
+    const sA = m.score?.fullTime?.home ?? null;
+    const sB = m.score?.fullTime?.away ?? null;
+    if (sA === null) continue;
+    const sheetRow = matchsSheet.find(r =>
+      r["Équipe A"]?.toLowerCase() === m.homeTeam.name.toLowerCase() &&
+      r["Équipe B"]?.toLowerCase() === m.awayTeam.name.toLowerCase()
+    );
+    const mid = sheetRow?.MatchID || String(m.id);
+    finishedMatches.push({ mid, sA, sB });
+  }
+
+  // Matchs depuis le sheet avec scores manuels
+  for (const r of matchsSheet) {
+    const sA = r["Score A"] !== undefined && r["Score A"] !== "" ? parseInt(r["Score A"]) : null;
+    const sB = r["Score B"] !== undefined && r["Score B"] !== "" ? parseInt(r["Score B"]) : null;
+    if (sA === null || sB === null) continue;
+    if (!finishedMatches.find(f => f.mid === r.MatchID)) {
+      finishedMatches.push({ mid: r.MatchID, sA, sB });
+    }
+  }
+
+  // Calcul points par joueur
+  for (const p of pronos) {
+    if (!scores[p.Joueur]) scores[p.Joueur] = { pts: 0, played: 0, exact: 0, good: 0 };
+    const fm = finishedMatches.find(f => f.mid === p.MatchID);
+    if (!fm) continue;
+    const res = computeResult(p.Pronostic, fm.sA, fm.sB, "FINISHED");
+    if (!res) continue;
+    scores[p.Joueur].played++;
+    scores[p.Joueur].pts += res.pts;
+    if (res.pts === 2) scores[p.Joueur].exact++;
+    if (res.pts === 1) scores[p.Joueur].good++;
+  }
+
+  const sorted = Object.entries(scores).sort((a, b) =>
+    b[1].pts - a[1].pts || b[1].exact - a[1].exact || b[1].good - a[1].good
+  );
+
+  if (sorted.length === 0) {
+    return `<div class="state-block"><div class="state-icon">📊</div><p>Le classement apparaîtra une fois les premiers matchs terminés.</p></div>`;
+  }
+
+  const medals = ["🥇","🥈","🥉"];
+  const podiumClass = ["podium-1","podium-2","podium-3"];
+
+  const rows = sorted.map(([name, s], idx) => {
+    const rank = idx < 3 ? medals[idx] : `<span class="rank-number">${idx + 1}</span>`;
+    const pc = idx < 3 ? podiumClass[idx] : "";
+    return `
+      <tr class="${pc}">
+        <td class="rank-cell">${rank}</td>
+        <td class="player-name">${escHtml(name)}</td>
+        <td class="pts-cell">${s.pts}</td>
+        <td class="stat-cell">${s.played}</td>
+        <td class="stat-cell">${s.exact}</td>
+        <td class="stat-cell">${s.good}</td>
+      </tr>`;
+  }).join("");
+
+  return `
+    <table class="ranking-table" aria-label="Classement">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Joueur</th>
+          <th>Pts</th>
+          <th>Joués</th>
+          <th>Exacts</th>
+          <th>Bons</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function escHtml(s) {
+  if (!s) return "";
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+// ── Gestion onglets ───────────────────────────────────────────
+document.querySelectorAll(".tab-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById(`tab-${btn.dataset.tab}`).classList.add("active");
+  });
+});
+
+// ── Cycle de rafraîchissement ─────────────────────────────────
+let apiMatches = [], matchsSheet = [], pronos = [];
+
+async function loadAll() {
+  const dot = document.getElementById("refresh-dot");
+  dot.classList.add("refreshing");
+
+  try {
+    const [apiRes, sheetMatchs, sheetPronos] = await Promise.allSettled([
+      fetchAPIMatches(),
+      fetchCSV(SHEET_MATCHS_URL),
+      fetchCSV(SHEET_PRONOS_URL)
+    ]);
+
+    if (apiRes.status === "fulfilled") apiMatches = apiRes.value;
+    if (sheetMatchs.status === "fulfilled") matchsSheet = sheetMatchs.value;
+    if (sheetPronos.status === "fulfilled") pronos = sheetPronos.value;
+
+    renderAll();
+
+    const ts = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    document.getElementById("last-update").textContent = `Dernière mise à jour : ${ts}`;
+  } catch(e) {
+    console.error(e);
+  } finally {
+    dot.classList.remove("refreshing");
+  }
+}
+
+function renderAll() {
+  // ── Matchs ──
+  const matchsContainer = document.getElementById("matchs-container");
+  document.getElementById("matchs-date").textContent = todayLabel();
+
+  if (apiMatches.length === 0 && matchsSheet.length === 0) {
+    matchsContainer.innerHTML = `
+      <div class="state-block">
+        <div class="state-icon">📅</div>
+        <p>Aucun match de Coupe du Monde aujourd'hui, ou données indisponibles.<br>
+        Vérifiez votre clé API et les URLs du Google Sheets.</p>
+      </div>`;
+  } else {
+    // Si pas de matchs API mais données sheet, afficher depuis sheet
+    let toRender = apiMatches;
+    if (toRender.length === 0 && matchsSheet.length > 0) {
+      // Construire matchs factices depuis le sheet pour le jour courant
+      const today = new Date().toISOString().split("T")[0];
+      toRender = matchsSheet
+        .filter(r => r.Date && r.Date.startsWith(today))
+        .map(r => ({
+          id: r.MatchID,
+          homeTeam: { name: r["Équipe A"] },
+          awayTeam: { name: r["Équipe B"] },
+          utcDate: r.Date || new Date().toISOString(),
+          status: (r["Score A"] !== "" && r["Score B"] !== "") ? "FINISHED" : "TIMED",
+          score: { fullTime: { home: r["Score A"] !== "" ? parseInt(r["Score A"]) : null, away: r["Score B"] !== "" ? parseInt(r["Score B"]) : null } },
+          group: ""
+        }));
+    }
+
+    if (toRender.length === 0) {
+      matchsContainer.innerHTML = `<div class="state-block"><div class="state-icon">📅</div><p>Aucun match aujourd'hui.</p></div>`;
+    } else {
+      matchsContainer.innerHTML = toRender.map((m, i) => renderMatchCard(m, pronos, matchsSheet, i)).join("");
+    }
+  }
+
+  // ── Classement ──
+  document.getElementById("ranking-container").innerHTML = renderRanking(matchsSheet, pronos, apiMatches);
+}
+
+// ── Init ──────────────────────────────────────────────────────
+loadAll();
+setInterval(loadAll, REFRESH_INTERVAL);
+</script>
+</body>
+</html>
