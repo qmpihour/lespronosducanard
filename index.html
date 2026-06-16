@@ -621,8 +621,9 @@ function todayLabel() {
 }
 
 // ── Rendu d'une carte match ───────────────────────────────────
-function renderMatchCard(match, pronos, matchsSheet, i) {
-  const { id, homeTeam, awayTeam, utcDate, status, score } = match;
+// matchPronos : [{joueur, prono}] déjà filtrés pour ce match
+function renderMatchCard(match, matchPronos, matchsSheet, sheetMatchID, i) {
+  const { homeTeam, awayTeam, utcDate, status, score } = match;
   const teamA = homeTeam.name;
   const teamB = awayTeam.name;
   const flagA = getFlag(teamA);
@@ -630,17 +631,8 @@ function renderMatchCard(match, pronos, matchsSheet, i) {
   const scoreA = score?.fullTime?.home ?? score?.regularTime?.home ?? null;
   const scoreB = score?.fullTime?.away ?? score?.regularTime?.away ?? null;
 
-  // Cherche le MatchID dans le sheet Matchs via nom d'équipes
-  const sheetRow = matchsSheet.find(r =>
-    r["Équipe A"]?.toLowerCase() === teamA.toLowerCase() &&
-    r["Équipe B"]?.toLowerCase() === teamB.toLowerCase()
-  ) || matchsSheet.find(r =>
-    r["Équipe A"]?.toLowerCase().includes(teamA.split(" ")[0].toLowerCase()) &&
-    r["Équipe B"]?.toLowerCase().includes(teamB.split(" ")[0].toLowerCase())
-  );
-  const sheetMatchID = sheetRow?.MatchID || String(id);
-
-  // Score dans le sheet (si rempli manuellement)
+  // Score dans le sheet (fallback manuel)
+  const sheetRow = matchsSheet.find(r => r.MatchID === sheetMatchID);
   const sheetScoreA = sheetRow?.["Score A"] !== undefined && sheetRow["Score A"] !== "" ? parseInt(sheetRow["Score A"]) : null;
   const sheetScoreB = sheetRow?.["Score B"] !== undefined && sheetRow["Score B"] !== "" ? parseInt(sheetRow["Score B"]) : null;
 
@@ -648,11 +640,6 @@ function renderMatchCard(match, pronos, matchsSheet, i) {
   const realScoreA = scoreA !== null ? scoreA : sheetScoreA;
   const realScoreB = scoreB !== null ? scoreB : sheetScoreB;
   const realStatus = status || (sheetScoreA !== null ? "FINISHED" : "TIMED");
-
-  // Pronostics pour ce match
-  const matchPronos = pronos.filter(p =>
-    p.MatchID === sheetMatchID || p.MatchID === String(id)
-  );
 
   const now = new Date();
   const kickoff = new Date(utcDate);
@@ -674,24 +661,22 @@ function renderMatchCard(match, pronos, matchsSheet, i) {
   }
 
   // Pronostics section
-  let pronosHTML = "";
-  if (matchPronos.length > 0) {
-    if (!started) {
-      pronosHTML = `<p class="hidden-prono">🔒 Pronostics révélés au coup d'envoi</p>`;
-    } else {
-      const chips = matchPronos.map(p => {
-        const res = computeResult(p.Pronostic, realScoreA, realScoreB, realStatus);
-        return `
-          <div class="prono-chip">
-            <span class="prono-name">${escHtml(p.Joueur)}</span>
-            <span class="prono-right">
-              <span class="prono-score">${escHtml(p.Pronostic)}</span>
-              ${res ? `<span class="prono-result" title="${res.label}">${res.icon}</span>` : ""}
-            </span>
-          </div>`;
-      }).join("");
-      pronosHTML = `<div class="pronos-grid">${chips}</div>`;
-    }
+  let pronosHTML;
+  if (!started) {
+    pronosHTML = `<p class="hidden-prono">🔒 Pronostics révélés au coup d'envoi</p>`;
+  } else {
+    const chips = matchPronos.map(p => {
+      const res = computeResult(p.prono, realScoreA, realScoreB, realStatus);
+      return `
+        <div class="prono-chip">
+          <span class="prono-name">${escHtml(p.joueur)}</span>
+          <span class="prono-right">
+            <span class="prono-score">${escHtml(p.prono)}</span>
+            ${res ? `<span class="prono-result" title="${res.label}">${res.icon}</span>` : ""}
+          </span>
+        </div>`;
+    }).join("");
+    pronosHTML = `<div class="pronos-grid">${chips}</div>`;
   }
 
   const group = match.group ? `Groupe ${match.group.replace("GROUP_","").replace("_"," ")}` : "Poules";
@@ -716,54 +701,57 @@ function renderMatchCard(match, pronos, matchsSheet, i) {
         </div>
       </div>
     </div>
-    ${matchPronos.length > 0 ? `
     <div class="pronos-section">
       <p class="pronos-title">Pronostics</p>
       ${pronosHTML}
-    </div>` : ""}
+    </div>
   </div>`;
 }
 
 // ── Rendu classement ──────────────────────────────────────────
-function renderRanking(matchsSheet, pronos, apiMatches) {
+// pronosData : { joueurs: string[], byMatchID: Map<string, {joueur, prono}[]> }
+function renderRanking(matchsSheet, pronosData, apiMatches) {
   const scores = {};
 
-  // Rassemble tous les matchs terminés
-  const finishedMatches = [];
+  // Initialise tous les joueurs connus (même ceux à 0 pt)
+  for (const j of pronosData.joueurs) {
+    scores[j] = { pts: 0, played: 0, exact: 0, good: 0 };
+  }
+
+  // Rassemble tous les matchs terminés avec leurs scores
+  const finishedMatches = new Map(); // mid → {sA, sB}
   for (const m of apiMatches) {
     if (m.status !== "FINISHED") continue;
     const sA = m.score?.fullTime?.home ?? null;
     const sB = m.score?.fullTime?.away ?? null;
     if (sA === null) continue;
-    const sheetRow = matchsSheet.find(r =>
-      r["Équipe A"]?.toLowerCase() === m.homeTeam.name.toLowerCase() &&
-      r["Équipe B"]?.toLowerCase() === m.awayTeam.name.toLowerCase()
-    );
-    const mid = sheetRow?.MatchID || String(m.id);
-    finishedMatches.push({ mid, sA, sB });
+    const mid = resolveSheetMatchID(m, matchsSheet);
+    finishedMatches.set(mid, { sA, sB });
+    // aussi indexer par id API brut
+    finishedMatches.set(String(m.id), { sA, sB });
   }
 
-  // Matchs depuis le sheet avec scores manuels
+  // Scores manuels du sheet Matchs
   for (const r of matchsSheet) {
     const sA = r["Score A"] !== undefined && r["Score A"] !== "" ? parseInt(r["Score A"]) : null;
     const sB = r["Score B"] !== undefined && r["Score B"] !== "" ? parseInt(r["Score B"]) : null;
-    if (sA === null || sB === null) continue;
-    if (!finishedMatches.find(f => f.mid === r.MatchID)) {
-      finishedMatches.push({ mid: r.MatchID, sA, sB });
-    }
+    if (sA === null || sB === null || !r.MatchID) continue;
+    if (!finishedMatches.has(r.MatchID)) finishedMatches.set(r.MatchID, { sA, sB });
   }
 
-  // Calcul points par joueur
-  for (const p of pronos) {
-    if (!scores[p.Joueur]) scores[p.Joueur] = { pts: 0, played: 0, exact: 0, good: 0 };
-    const fm = finishedMatches.find(f => f.mid === p.MatchID);
+  // Calcul des points depuis les pronostics (format large)
+  for (const [mid, pronos] of pronosData.byMatchID) {
+    const fm = finishedMatches.get(mid);
     if (!fm) continue;
-    const res = computeResult(p.Pronostic, fm.sA, fm.sB, "FINISHED");
-    if (!res) continue;
-    scores[p.Joueur].played++;
-    scores[p.Joueur].pts += res.pts;
-    if (res.pts === 2) scores[p.Joueur].exact++;
-    if (res.pts === 1) scores[p.Joueur].good++;
+    for (const { joueur, prono } of pronos) {
+      if (!scores[joueur]) scores[joueur] = { pts: 0, played: 0, exact: 0, good: 0 };
+      const res = computeResult(prono, fm.sA, fm.sB, "FINISHED");
+      if (!res) continue;
+      scores[joueur].played++;
+      scores[joueur].pts += res.pts;
+      if (res.pts === 2) scores[joueur].exact++;
+      if (res.pts === 1) scores[joueur].good++;
+    }
   }
 
   const sorted = Object.entries(scores).sort((a, b) =>
@@ -822,8 +810,33 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
   });
 });
 
+// ── Parsing du sheet Pronostics (format large) ────────────────
+// Entrée  : tableau de lignes CSV parsées (objets clé→valeur)
+//           en-tête : MatchID | Match | Joueur1 | Joueur2 | …
+// Sortie  : { joueurs: string[], byMatchID: Map<string, {joueur, prono}[]> }
+function parsePronos(rows) {
+  if (!rows.length) return { joueurs: [], byMatchID: new Map() };
+
+  // Les joueurs sont toutes les colonnes à partir de la 3e (index 2+)
+  const allKeys = Object.keys(rows[0]);
+  const joueurs = allKeys.slice(2).filter(k => k.trim() !== "");
+
+  const byMatchID = new Map();
+  for (const row of rows) {
+    const mid = (row["MatchID"] || row[allKeys[0]] || "").trim();
+    if (!mid) continue;
+    const list = [];
+    for (const joueur of joueurs) {
+      const prono = (row[joueur] || "").trim();
+      if (prono) list.push({ joueur, prono });
+    }
+    if (list.length > 0) byMatchID.set(mid, list);
+  }
+  return { joueurs, byMatchID };
+}
+
 // ── Cycle de rafraîchissement ─────────────────────────────────
-let apiMatches = [], matchsSheet = [], pronos = [];
+let apiMatches = [], matchsSheet = [], pronosData = { joueurs: [], byMatchID: new Map() };
 
 async function loadAll() {
   const dot = document.getElementById("refresh-dot");
@@ -838,7 +851,7 @@ async function loadAll() {
 
     if (apiRes.status === "fulfilled") apiMatches = apiRes.value;
     if (sheetMatchs.status === "fulfilled") matchsSheet = sheetMatchs.value;
-    if (sheetPronos.status === "fulfilled") pronos = sheetPronos.value;
+    if (sheetPronos.status === "fulfilled") pronosData = parsePronos(sheetPronos.value);
 
     renderAll();
 
@@ -856,41 +869,62 @@ function renderAll() {
   const matchsContainer = document.getElementById("matchs-container");
   document.getElementById("matchs-date").textContent = todayLabel();
 
-  if (apiMatches.length === 0 && matchsSheet.length === 0) {
-    matchsContainer.innerHTML = `
-      <div class="state-block">
-        <div class="state-icon">📅</div>
-        <p>Aucun match de Coupe du Monde aujourd'hui, ou données indisponibles.<br>
-        Vérifiez votre clé API et les URLs du Google Sheets.</p>
-      </div>`;
-  } else {
-    // Si pas de matchs API mais données sheet, afficher depuis sheet
-    let toRender = apiMatches;
-    if (toRender.length === 0 && matchsSheet.length > 0) {
-      // Construire matchs factices depuis le sheet pour le jour courant
-      const today = new Date().toISOString().split("T")[0];
-      toRender = matchsSheet
-        .filter(r => r.Date && r.Date.startsWith(today))
-        .map(r => ({
-          id: r.MatchID,
-          homeTeam: { name: r["Équipe A"] },
-          awayTeam: { name: r["Équipe B"] },
-          utcDate: r.Date || new Date().toISOString(),
-          status: (r["Score A"] !== "" && r["Score B"] !== "") ? "FINISHED" : "TIMED",
-          score: { fullTime: { home: r["Score A"] !== "" ? parseInt(r["Score A"]) : null, away: r["Score B"] !== "" ? parseInt(r["Score B"]) : null } },
-          group: ""
-        }));
-    }
+  // Construit la liste des matchs à afficher (API + fallback sheet)
+  let toRender = apiMatches;
+  if (toRender.length === 0 && matchsSheet.length > 0) {
+    const today = new Date().toISOString().split("T")[0];
+    toRender = matchsSheet
+      .filter(r => r.Date && r.Date.startsWith(today))
+      .map(r => ({
+        id: r.MatchID,
+        homeTeam: { name: r["Équipe A"] },
+        awayTeam: { name: r["Équipe B"] },
+        utcDate: r.Date || new Date().toISOString(),
+        status: (r["Score A"] !== "" && r["Score B"] !== "") ? "FINISHED" : "TIMED",
+        score: { fullTime: { home: r["Score A"] !== "" ? parseInt(r["Score A"]) : null, away: r["Score B"] !== "" ? parseInt(r["Score B"]) : null } },
+        group: ""
+      }));
+  }
 
-    if (toRender.length === 0) {
-      matchsContainer.innerHTML = `<div class="state-block"><div class="state-icon">📅</div><p>Aucun match aujourd'hui.</p></div>`;
-    } else {
-      matchsContainer.innerHTML = toRender.map((m, i) => renderMatchCard(m, pronos, matchsSheet, i)).join("");
-    }
+  // Résolution du MatchID sheet pour chaque match API, puis filtre :
+  // on n'affiche que les matchs pour lesquels au moins un prono existe.
+  const withPronos = toRender
+    .map(m => {
+      const sheetMatchID = resolveSheetMatchID(m, matchsSheet);
+      const pronos = pronosData.byMatchID.get(sheetMatchID) || pronosData.byMatchID.get(String(m.id)) || [];
+      return { match: m, sheetMatchID, pronos };
+    })
+    .filter(({ pronos }) => pronos.length > 0);
+
+  if (withPronos.length === 0) {
+    const msg = pronosData.byMatchID.size === 0
+      ? "Aucun pronostic saisi dans le Google Sheets pour aujourd'hui."
+      : "Aucun match aujourd'hui avec des pronostics enregistrés.";
+    matchsContainer.innerHTML = `<div class="state-block"><div class="state-icon">📅</div><p>${msg}</p></div>`;
+  } else {
+    matchsContainer.innerHTML = withPronos
+      .map(({ match, sheetMatchID, pronos }, i) =>
+        renderMatchCard(match, pronos, matchsSheet, sheetMatchID, i))
+      .join("");
   }
 
   // ── Classement ──
-  document.getElementById("ranking-container").innerHTML = renderRanking(matchsSheet, pronos, apiMatches);
+  document.getElementById("ranking-container").innerHTML =
+    renderRanking(matchsSheet, pronosData, apiMatches);
+}
+
+// ── Résolution du MatchID sheet depuis un objet match API ──────
+function resolveSheetMatchID(match, matchsSheet) {
+  const teamA = match.homeTeam.name;
+  const teamB = match.awayTeam.name;
+  const row = matchsSheet.find(r =>
+    r["Équipe A"]?.toLowerCase() === teamA.toLowerCase() &&
+    r["Équipe B"]?.toLowerCase() === teamB.toLowerCase()
+  ) || matchsSheet.find(r =>
+    r["Équipe A"]?.toLowerCase().includes(teamA.split(" ")[0].toLowerCase()) &&
+    r["Équipe B"]?.toLowerCase().includes(teamB.split(" ")[0].toLowerCase())
+  );
+  return row?.MatchID || String(match.id);
 }
 
 // ── Init ──────────────────────────────────────────────────────
