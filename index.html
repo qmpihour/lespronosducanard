@@ -464,6 +464,26 @@
 
     .refresh-dot.refreshing { background: var(--accent); animation: pulse 0.8s infinite; }
 
+    #refresh-btn {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 1rem;
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: var(--transition);
+      padding: 0;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    #refresh-btn:hover { background: rgba(255,255,255,0.12); color: var(--text); }
+    #refresh-btn.spinning { animation: spin 0.6s linear infinite; color: var(--accent); }
+
     /* ─── RESPONSIVE ────────────────────────────────────────────── */
     @media (max-width: 480px) {
       .team-flag { font-size: 1.8rem; }
@@ -509,6 +529,7 @@
 <footer class="footer">
   <div class="refresh-dot" id="refresh-dot"></div>
   <span id="last-update">En attente de données…</span>
+  <button id="refresh-btn" onclick="manualRefresh()" title="Forcer l'actualisation">↻</button>
 </footer>
 
 <script>
@@ -925,6 +946,16 @@ function resolveSheetMatchID(match, matchsSheet) {
     r["Équipe B"]?.toLowerCase().includes(teamB.split(" ")[0].toLowerCase())
   );
   return row?.MatchID || String(match.id);
+}
+
+// ── Refresh manuel ───────────────────────────────────────────
+async function manualRefresh() {
+  const btn = document.getElementById("refresh-btn");
+  btn.classList.add("spinning");
+  btn.disabled = true;
+  await loadAll();
+  btn.classList.remove("spinning");
+  btn.disabled = false;
 }
 
 // ── Init ──────────────────────────────────────────────────────
