@@ -620,7 +620,9 @@
 /* ═══════════════════════════════════════════════════════════════
    ⚙️ CONFIGURATION — à modifier avant déploiement
    ═══════════════════════════════════════════════════════════════ */
-const FOOTBALL_API_KEY  = "833c98f22beb43e783975a448ac5b3e7";
+// ⚙️ Remplace TON_WORKER_URL_ICI par l'URL de ton Cloudflare Worker
+// ex: "https://pronos-proxy.ton-slug.workers.dev"
+const FOOTBALL_API_PROXY_URL = "https://broad-firefly-0619.qmpihour-pro.workers.dev";
 const SHEET_MATCHS_URL  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT7-6Ao0BMuT1OP_HII2trYSIimF5tMaMPq6fEHZQ3_hojeyzGqi-ULjE5zgz3xaXOA_E4PDKcn3TJv/pub?gid=0&single=true&output=csv";
 const SHEET_PRONOS_URL  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT7-6Ao0BMuT1OP_HII2trYSIimF5tMaMPq6fEHZQ3_hojeyzGqi-ULjE5zgz3xaXOA_E4PDKcn3TJv/pub?gid=281674232&single=true&output=csv";
 /* ═══════════════════════════════════════════════════════════════ */
@@ -698,16 +700,29 @@ async function fetchCSV(url) {
   throw lastErr;
 }
 
-// ── Fetch API football-data.org ────────────────────────────────
+// ── Fetch scores via Cloudflare Worker (proxy CORS) ───────────
+// Le Worker relaie api.football-data.org avec ta clé côté serveur.
+// Sans restriction CORS → scores temps réel dans le navigateur.
 async function fetchAPIMatches() {
+  if (!FOOTBALL_API_PROXY_URL || FOOTBALL_API_PROXY_URL === "TON_WORKER_URL_ICI") {
+    dbg("Worker non configuré — scores via sheet uniquement");
+    return [];
+  }
   const today = new Date().toISOString().split("T")[0];
-  const url = `https://api.football-data.org/v4/competitions/WC/matches?dateFrom=${today}&dateTo=${today}&stage=GROUP_STAGE`;
-  const res = await fetch(url, {
-    headers: { "X-Auth-Token": FOOTBALL_API_KEY }
-  });
-  if (!res.ok) throw new Error(`API football-data: HTTP ${res.status}`);
-  const data = await res.json();
-  return data.matches || [];
+  const base = FOOTBALL_API_PROXY_URL.replace(/\/$/, "");
+  const url = `${base}/competitions/WC/matches?dateFrom=${today}&dateTo=${today}`;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!res.ok) {
+      dbg(`Worker HTTP ${res.status} — scores via sheet`);
+      return [];
+    }
+    const data = await res.json();
+    return data.matches || [];
+  } catch(e) {
+    dbg(`Worker inaccessible (${e.message}) — scores via sheet`);
+    return [];
+  }
 }
 
 // ── Calcul résultat d'un pronostic ────────────────────────────
@@ -1090,6 +1105,20 @@ function renderAll() {
         score: { fullTime: { home: r["Score A"] !== "" ? parseInt(r["Score A"]) : null, away: r["Score B"] !== "" ? parseInt(r["Score B"]) : null } },
         group: ""
       }));
+  }
+
+  // Enrichit le sheet Matchs avec les scores de l'API (si dispo)
+  // pour que renderRanking puisse les utiliser même sans saisie manuelle
+  for (const m of apiMatches) {
+    const sA = m.score?.fullTime?.home ?? null;
+    const sB = m.score?.fullTime?.away ?? null;
+    if (sA === null) continue;
+    const mid = resolveSheetMatchID(m, matchsSheet);
+    const row = matchsSheet.find(r => r.MatchID === mid);
+    if (row) {
+      if (row["Score A"] === "" || row["Score A"] === undefined) row["Score A"] = String(sA);
+      if (row["Score B"] === "" || row["Score B"] === undefined) row["Score B"] = String(sB);
+    }
   }
 
   // Résolution du MatchID sheet pour chaque match API, puis filtre :
