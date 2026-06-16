@@ -840,18 +840,26 @@ function parsePronos(rows) {
 
   // Les joueurs sont toutes les colonnes à partir de la 3e (index 2+)
   const allKeys = Object.keys(rows[0]);
+  const col0 = allKeys[0]; // MatchID
+  const col1 = allKeys[1]; // Match (label lisible ex: "France - Sénégal")
   const joueurs = allKeys.slice(2).filter(k => k.trim() !== "");
 
   const byMatchID = new Map();
   for (const row of rows) {
-    const mid = (row["MatchID"] || row[allKeys[0]] || "").trim();
-    if (!mid) continue;
+    const mid = (row[col0] || "").trim();
+    const matchLabel = (row[col1] || "").trim(); // ex: "France - Sénégal"
+    if (!mid && !matchLabel) continue;
+
     const list = [];
     for (const joueur of joueurs) {
       const prono = (row[joueur] || "").trim();
       if (prono) list.push({ joueur, prono });
     }
-    if (list.length > 0) byMatchID.set(mid, list);
+    if (list.length === 0) continue;
+
+    // Indexé par MatchID ET par le label du match (fallback)
+    if (mid) byMatchID.set(mid, list);
+    if (matchLabel) byMatchID.set(matchLabel.toLowerCase(), list);
   }
   return { joueurs, byMatchID };
 }
@@ -891,11 +899,12 @@ function renderAll() {
   document.getElementById("matchs-date").textContent = todayLabel();
 
   // Construit la liste des matchs à afficher (API + fallback sheet)
+  // Le filtre de date est volontairement absent : l'utilisateur gère
+  // lui-même les lignes du sheet (supprimer les matchs passés).
   let toRender = apiMatches;
   if (toRender.length === 0 && matchsSheet.length > 0) {
-    const today = new Date().toISOString().split("T")[0];
     toRender = matchsSheet
-      .filter(r => r.Date && r.Date.startsWith(today))
+      .filter(r => r["Équipe A"] && r["Équipe B"])   // ligne valide
       .map(r => ({
         id: r.MatchID,
         homeTeam: { name: r["Équipe A"] },
@@ -912,7 +921,15 @@ function renderAll() {
   const withPronos = toRender
     .map(m => {
       const sheetMatchID = resolveSheetMatchID(m, matchsSheet);
-      const pronos = pronosData.byMatchID.get(sheetMatchID) || pronosData.byMatchID.get(String(m.id)) || [];
+      const teamA = m.homeTeam.name;
+      const teamB = m.awayTeam.name;
+      // Tentatives de lookup dans l'ordre : MatchID sheet, ID API brut, label "A - B", label "B - A"
+      const pronos =
+        pronosData.byMatchID.get(sheetMatchID) ||
+        pronosData.byMatchID.get(String(m.id)) ||
+        pronosData.byMatchID.get(`${teamA} - ${teamB}`.toLowerCase()) ||
+        pronosData.byMatchID.get(`${teamB} - ${teamA}`.toLowerCase()) ||
+        [];
       return { match: m, sheetMatchID, pronos };
     })
     .filter(({ pronos }) => pronos.length > 0);
