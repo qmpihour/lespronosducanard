@@ -526,6 +526,8 @@
   </div>
 </main>
 
+<div id="debug-panel" style="display:none; max-width:900px; margin:0 auto 1rem; padding:0.75rem 1rem; background:#1a1a0a; border:1px solid #665500; border-radius:10px; font-size:0.72rem; color:#ccaa44; line-height:1.8; font-family:monospace;"></div>
+
 <footer class="footer">
   <div class="refresh-dot" id="refresh-dot"></div>
   <span id="last-update">En attente de données…</span>
@@ -879,8 +881,40 @@ async function loadAll() {
     ]);
 
     if (apiRes.status === "fulfilled") apiMatches = apiRes.value;
-    if (sheetMatchs.status === "fulfilled") matchsSheet = sheetMatchs.value;
-    if (sheetPronos.status === "fulfilled") pronosData = parsePronos(sheetPronos.value);
+
+    if (sheetMatchs.status === "fulfilled") {
+      matchsSheet = sheetMatchs.value;
+    } else {
+      console.error("Sheet Matchs KO:", sheetMatchs.reason);
+    }
+
+    if (sheetPronos.status === "fulfilled") {
+      pronosData = parsePronos(sheetPronos.value);
+    } else {
+      console.error("Sheet Pronos KO:", sheetPronos.reason);
+    }
+
+    // ── Debug panel ───────────────────────────────────────────
+    const dbgEl = document.getElementById("debug-panel");
+    if (dbgEl) {
+      const matchsStatus = sheetMatchs.status === "fulfilled"
+        ? `✅ ${matchsSheet.length} ligne(s) — colonnes : ${Object.keys(matchsSheet[0] || {}).join(" | ")}`
+        : `❌ ${sheetMatchs.reason}`;
+      const pronosRaw = sheetPronos.status === "fulfilled" ? sheetPronos.value : [];
+      const pronosStatus = sheetPronos.status === "fulfilled"
+        ? `✅ ${pronosRaw.length} ligne(s) — colonnes : ${Object.keys(pronosRaw[0] || {}).join(" | ")}`
+        : `❌ ${sheetPronos.reason}`;
+      const byMatchKeys = [...pronosData.byMatchID.keys()];
+      dbgEl.innerHTML = `
+        <b>Sheet Matchs :</b> ${matchsStatus}<br>
+        <b>Sheet Pronos :</b> ${pronosStatus}<br>
+        <b>MatchIDs détectés dans Pronos :</b> ${byMatchKeys.length ? byMatchKeys.join(", ") : "(aucun)"}<br>
+        <b>Joueurs détectés :</b> ${pronosData.joueurs.length ? pronosData.joueurs.join(", ") : "(aucun)"}<br>
+        <b>Matchs sheet Matchs :</b> ${matchsSheet.map(r => r["Équipe A"] + " vs " + r["Équipe B"] + " (ID: " + r.MatchID + ")").join(" · ") || "(aucun)"}
+      `;
+      dbgEl.style.display = "block";
+    }
+    // ─────────────────────────────────────────────────────────
 
     renderAll();
 
