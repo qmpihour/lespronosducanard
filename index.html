@@ -1238,12 +1238,20 @@ async function loadAll() {
         ? `✅ ${pronosRaw.length} ligne(s) — colonnes : ${Object.keys(pronosRaw[0] || {}).join(" | ")}`
         : `❌ ${sheetPronos.reason}`;
       const byMatchKeys = [...pronosData.byMatchID.keys()];
+
+      // Debug statuts API
+      const apiDbg = apiMatches.map(m => {
+        const mid = resolveSheetMatchID(m, matchsSheet);
+        return `${mid} → ${m.homeTeam.name} vs ${m.awayTeam.name} | <b>${m.status}</b>`;
+      }).join("<br>");
+
       dbgEl.innerHTML = `
         <b>Sheet Matchs :</b> ${matchsStatus}<br>
         <b>Sheet Pronos :</b> ${pronosStatus}<br>
         <b>MatchIDs détectés dans Pronos :</b> ${byMatchKeys.length ? byMatchKeys.join(", ") : "(aucun)"}<br>
         <b>Joueurs détectés :</b> ${pronosData.joueurs.length ? pronosData.joueurs.join(", ") : "(aucun)"}<br>
-        <b>Matchs sheet Matchs :</b> ${matchsSheet.map(r => r["Équipe A"] + " vs " + r["Équipe B"] + " (ID: " + r.MatchID + ")").join(" · ") || "(aucun)"}
+        <b>Matchs sheet Matchs :</b> ${matchsSheet.map(r => r["Équipe A"] + " vs " + r["Équipe B"] + " (ID: " + r.MatchID + ")").join(" · ") || "(aucun)"}<br><br>
+        <b>Statuts API reçus (${apiMatches.length} matchs) :</b><br>${apiDbg || "(aucun)"}
       `;
       dbgEl.style.display = "block";
     }
@@ -1277,13 +1285,21 @@ function renderAll() {
     }
   }
 
+  // ── Index API par MatchID résolu (construit une seule fois) ─
+  const apiByMatchID = new Map();
+  for (const m of apiMatches) {
+    const mid = resolveSheetMatchID(m, matchsSheet);
+    apiByMatchID.set(mid, m);
+    apiByMatchID.set(String(m.id), m); // aussi par ID numérique API
+  }
+
   // ── Construit la liste complète depuis le sheet ───────────
   // Tous les matchs avec au moins un prono, quelle que soit la date.
   const allMatchs = matchsSheet
     .filter(r => r["Équipe A"] && r["Équipe B"])
     .map(r => {
       // Cherche le match correspondant dans l'API pour avoir le statut live
-      const apiMatch = apiMatches.find(m => resolveSheetMatchID(m, matchsSheet) === r.MatchID);
+      const apiMatch = apiByMatchID.get(r.MatchID);
       const sheetHasScore = r["Score A"] !== "" && r["Score B"] !== "" &&
                             r["Score A"] !== undefined && r["Score B"] !== undefined;
       // Statut : l'API est TOUJOURS autoritaire.
