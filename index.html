@@ -960,15 +960,16 @@ function renderMatchCard(match, matchPronos, matchsSheet, sheetMatchID, i, isPas
   const scoreA = score?.fullTime?.home ?? score?.regularTime?.home ?? null;
   const scoreB = score?.fullTime?.away ?? score?.regularTime?.away ?? null;
 
-  // Score dans le sheet (fallback manuel)
+  // Score dans le sheet (fallback si l'API n'a pas encore le score)
   const sheetRow = matchsSheet.find(r => r.MatchID === sheetMatchID);
   const sheetScoreA = sheetRow?.["Score A"] !== undefined && sheetRow["Score A"] !== "" ? parseInt(sheetRow["Score A"]) : null;
   const sheetScoreB = sheetRow?.["Score B"] !== undefined && sheetRow["Score B"] !== "" ? parseInt(sheetRow["Score B"]) : null;
 
-  // Priorité : score API, sinon sheet
+  // Le statut vient TOUJOURS de l'objet match (déjà résolu dans renderAll)
+  // On ne recalcule JAMAIS le statut depuis le sheet ici
+  const realStatus = status;
   const realScoreA = scoreA !== null ? scoreA : sheetScoreA;
   const realScoreB = scoreB !== null ? scoreB : sheetScoreB;
-  const realStatus = status || (sheetScoreA !== null ? "FINISHED" : "TIMED");
 
   const now = new Date();
   const kickoff = parseDate(utcDate) || new Date(utcDate);
