@@ -1283,16 +1283,21 @@ function renderAll() {
     .map(r => {
       // Cherche le match correspondant dans l'API pour avoir le statut live
       const apiMatch = apiMatches.find(m => resolveSheetMatchID(m, matchsSheet) === r.MatchID);
+      // Statut : priorité API (live/finished), sinon déduit du sheet
+      const sheetHasScore = r["Score A"] !== "" && r["Score B"] !== "" &&
+                            r["Score A"] !== undefined && r["Score B"] !== undefined;
+      const status = apiMatch?.status ||
+                     (sheetHasScore ? "FINISHED" : "TIMED");
       return {
         id: r.MatchID,
         homeTeam: { name: r["Équipe A"] },
         awayTeam: { name: r["Équipe B"] },
         utcDate: r.Date || "",
-        status: apiMatch?.status || ((r["Score A"] !== "" && r["Score B"] !== "") ? "FINISHED" : "TIMED"),
+        status,
         score: {
           fullTime: {
-            home: apiMatch?.score?.fullTime?.home ?? (r["Score A"] !== "" ? parseInt(r["Score A"]) : null),
-            away: apiMatch?.score?.fullTime?.away ?? (r["Score B"] !== "" ? parseInt(r["Score B"]) : null)
+            home: apiMatch?.score?.fullTime?.home ?? (sheetHasScore ? parseInt(r["Score A"]) : null),
+            away: apiMatch?.score?.fullTime?.away ?? (sheetHasScore ? parseInt(r["Score B"]) : null)
           }
         },
         group: apiMatch?.group || ""
@@ -1332,14 +1337,21 @@ function renderAll() {
   }
 
   const todayMatchs = allMatchs.filter(m => {
+    // Aujourd'hui = même jour ET pas encore terminé
+    // Un match FINISHED bascule en archive même s'il a lieu aujourd'hui
     const d = getMatchDay(m);
-    return d === todayStr || d === null;
+    const isToday = d === todayStr || d === null;
+    const isDone = m.match.status === "FINISHED";
+    return isToday && !isDone;
   });
 
   const pastMatchs = allMatchs
     .filter(m => {
       const d = getMatchDay(m);
-      return d !== null && d < todayStr;
+      const isToday = d === todayStr || d === null;
+      const isDone = m.match.status === "FINISHED";
+      // Archive = jour passé OU terminé aujourd'hui
+      return (d !== null && d < todayStr) || (isToday && isDone);
     })
     .sort((a, b) => {
       const dA = getMatchDay(a), dB = getMatchDay(b);
