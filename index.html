@@ -1421,15 +1421,42 @@ function renderAll() {
 }
 
 // ── Résolution du MatchID sheet depuis un objet match API ──────
+// Utilise la même table de normalisation que le script Apps Script
+const API_TO_FR = {
+  "senegal":"sénégal","ivory coast":"côte d'ivoire","cape verde islands":"cap-vert",
+  "cape verde":"cap-vert","congo dr":"rd congo","dr congo":"rd congo",
+  "new zealand":"nouvelle-zélande","saudi arabia":"arabie saoudite","sweden":"suède",
+  "tunisia":"tunisie","belgium":"belgique","egypt":"égypte","spain":"espagne",
+  "netherlands":"pays-bas","japan":"japon","germany":"allemagne","ecuador":"équateur",
+  "curacao":"curaçao","australia":"australie","turkey":"turquie","türkiye":"turquie",
+  "scotland":"écosse","norway":"norvège","iraq":"irak","argentina":"argentine",
+  "algeria":"algérie","austria":"autriche","jordan":"jordanie","england":"angleterre",
+  "croatia":"croatie","colombia":"colombie","uzbekistan":"ouzbékistan",
+  "czech republic":"rép. tchèque","czechia":"rép. tchèque",
+  "south africa":"afrique du sud","switzerland":"suisse",
+  "bosnia-herzegovina":"bosnie-herzégovine","bosnia and herzegovina":"bosnie-herzégovine",
+  "mexico":"mexique","korea republic":"corée du sud","south korea":"corée du sud",
+  "usa":"états-unis","united states":"états-unis","brazil":"brésil","morocco":"maroc",
+  "haiti":"haïti","iran":"iran","portugal":"portugal","ghana":"ghana","panama":"panama",
+  "paraguay":"paraguay","uruguay":"uruguay","canada":"canada","qatar":"qatar","france":"france",
+};
+
+function apiNameToFr(name) {
+  const brut = name.trim().toLowerCase();
+  const sansAccent = brut.normalize("NFD").replace(/[̀-ͯ]/g,"");
+  const traduit = API_TO_FR[brut] || API_TO_FR[sansAccent] || brut;
+  return traduit.normalize("NFD").replace(/[̀-ͯ]/g,"");
+}
+
+function normSheet(name) {
+  return (name||"").trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+}
+
 function resolveSheetMatchID(match, matchsSheet) {
-  const teamA = match.homeTeam.name;
-  const teamB = match.awayTeam.name;
+  const frA = apiNameToFr(match.homeTeam.name);
+  const frB = apiNameToFr(match.awayTeam.name);
   const row = matchsSheet.find(r =>
-    r["Équipe A"]?.toLowerCase() === teamA.toLowerCase() &&
-    r["Équipe B"]?.toLowerCase() === teamB.toLowerCase()
-  ) || matchsSheet.find(r =>
-    r["Équipe A"]?.toLowerCase().includes(teamA.split(" ")[0].toLowerCase()) &&
-    r["Équipe B"]?.toLowerCase().includes(teamB.split(" ")[0].toLowerCase())
+    normSheet(r["Équipe A"]) === frA && normSheet(r["Équipe B"]) === frB
   );
   return row?.MatchID || String(match.id);
 }
