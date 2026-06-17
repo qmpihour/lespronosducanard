@@ -1120,32 +1120,19 @@ function renderRanking(matchsSheet, pronosData, apiMatches) {
   const medals = ["🥇","🥈","🥉"];
   const podiumClass = ["podium-1","podium-2","podium-3"];
 
-  // Calcul des rangs en tenant compte des ex-æquo
-  // Deux joueurs avec le même score/exacts/bons ont le même rang
-  const ranks = [];
-  let currentRank = 1;
-  for (let i = 0; i < sorted.length; i++) {
-    if (i === 0) {
-      ranks.push(currentRank);
-    } else {
-      const [, prev] = sorted[i - 1];
-      const [, curr] = sorted[i];
-      if (curr.pts === prev.pts && curr.exact === prev.exact && curr.good === prev.good) {
-        ranks.push(ranks[i - 1]); // même rang
-      } else {
-        currentRank = i + 1;
-        ranks.push(currentRank);
-      }
-    }
-  }
+  // Calcul des rangs — ex-æquo basés uniquement sur les pts
+  // Tous ceux qui ont le même nombre de pts partagent le même rang
+  const uniquePts = [...new Set(sorted.map(([,s]) => s.pts))].sort((a,b) => b-a);
 
   const rows = sorted.map(([name, s], idx) => {
-    const rank = ranks[idx];
+    const rank = uniquePts.indexOf(s.pts) + 1; // rang selon pts uniquement
     const medal = rank <= 3 ? medals[rank - 1] : null;
     const pc = rank <= 3 ? podiumClass[rank - 1] : "";
+    // Rang numérique = position réelle dans le classement (pour les non-médaillés)
+    const numRank = sorted.slice(0, idx).filter(([,os]) => os.pts > s.pts).length + 1;
     const rankCell = medal
       ? medal
-      : `<span class="rank-number">${rank}</span>`;
+      : `<span class="rank-number">${numRank}</span>`;
     return `
       <tr class="${pc}">
         <td class="rank-cell">${rankCell}</td>
