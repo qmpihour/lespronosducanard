@@ -1283,23 +1283,34 @@ function renderAll() {
     .map(r => {
       // Cherche le match correspondant dans l'API pour avoir le statut live
       const apiMatch = apiMatches.find(m => resolveSheetMatchID(m, matchsSheet) === r.MatchID);
-      // Statut : priorité API (live/finished), sinon déduit du sheet
       const sheetHasScore = r["Score A"] !== "" && r["Score B"] !== "" &&
                             r["Score A"] !== undefined && r["Score B"] !== undefined;
-      const status = apiMatch?.status ||
-                     (sheetHasScore ? "FINISHED" : "TIMED");
+      // Statut : l'API est TOUJOURS autoritaire.
+      // Le sheet ne peut déduire FINISHED que si l'API ne connaît pas ce match.
+      let status, scoreHome, scoreAway;
+      if (apiMatch) {
+        // API trouvée → on prend tout depuis l'API
+        status    = apiMatch.status;
+        scoreHome = apiMatch.score?.fullTime?.home ?? null;
+        scoreAway = apiMatch.score?.fullTime?.away ?? null;
+        // Si l'API dit FINISHED mais n'a pas encore le score fullTime, fallback sheet
+        if (status === "FINISHED" && scoreHome === null && sheetHasScore) {
+          scoreHome = parseInt(r["Score A"]);
+          scoreAway = parseInt(r["Score B"]);
+        }
+      } else {
+        // Pas dans l'API (match futur hors fenêtre) → déduit du sheet
+        status    = sheetHasScore ? "FINISHED" : "TIMED";
+        scoreHome = sheetHasScore ? parseInt(r["Score A"]) : null;
+        scoreAway = sheetHasScore ? parseInt(r["Score B"]) : null;
+      }
       return {
         id: r.MatchID,
         homeTeam: { name: r["Équipe A"] },
         awayTeam: { name: r["Équipe B"] },
         utcDate: r.Date || "",
         status,
-        score: {
-          fullTime: {
-            home: apiMatch?.score?.fullTime?.home ?? (sheetHasScore ? parseInt(r["Score A"]) : null),
-            away: apiMatch?.score?.fullTime?.away ?? (sheetHasScore ? parseInt(r["Score B"]) : null)
-          }
-        },
+        score: { fullTime: { home: scoreHome, away: scoreAway } },
         group: apiMatch?.group || ""
       };
     })
