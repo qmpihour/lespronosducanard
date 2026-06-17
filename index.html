@@ -269,6 +269,13 @@
       margin-bottom: 0.75rem;
     }
 
+    .match-time {
+      color: rgba(255,255,255,0.25);
+      font-weight: 400;
+      letter-spacing: 0;
+      font-size: 0.65rem;
+    }
+
     .match-group {
       font-size: 0.68rem;
       font-weight: 600;
@@ -1029,12 +1036,13 @@ function renderMatchCard(match, matchPronos, matchsSheet, sheetMatchID, i, isPas
   const group = match.group ? `Groupe ${match.group.replace("GROUP_","").replace("_"," ")}` : "Poules";
   const delay = `animation-delay: ${i * 0.06}s`;
   const pastClass = isPast ? " card-past" : "";
+  const kickoffTime = formatTime(utcDate);
 
   return `
   <div class="match-card${pastClass}" style="${delay}">
     <div class="card-header">
       <div class="match-meta">
-        <span class="match-group">${escHtml(group)}</span>
+        <span class="match-group">${escHtml(group)} <span class="match-time">· ${kickoffTime}</span></span>
         <span class="match-status ${statusClass}">${statusLabel}</span>
       </div>
       <div class="teams-row">
@@ -1365,12 +1373,12 @@ function renderAll() {
   }
 
   const todayMatchs = allMatchs.filter(m => {
-    // Aujourd'hui = même jour ET pas encore terminé
-    // Un match FINISHED bascule en archive même s'il a lieu aujourd'hui
     const d = getMatchDay(m);
     const isToday = d === todayStr || d === null;
     const isDone = m.match.status === "FINISHED";
-    return isToday && !isDone;
+    const isLive = m.match.status === "IN_PLAY" || m.match.status === "PAUSED";
+    // Aujourd'hui : même jour non terminé, OU en cours (même si déborde sur le jour suivant)
+    return (isToday && !isDone) || isLive;
   });
 
   const pastMatchs = allMatchs
@@ -1378,8 +1386,9 @@ function renderAll() {
       const d = getMatchDay(m);
       const isToday = d === todayStr || d === null;
       const isDone = m.match.status === "FINISHED";
-      // Archive = jour passé OU terminé aujourd'hui
-      return (d !== null && d < todayStr) || (isToday && isDone);
+      const isLive = m.match.status === "IN_PLAY" || m.match.status === "PAUSED";
+      // Archive = terminé (quel que soit le jour), sauf si en cours
+      return isDone && !isLive;
     })
     .sort((a, b) => {
       const dA = getMatchDay(a), dB = getMatchDay(b);
@@ -1422,6 +1431,7 @@ function renderAll() {
     for (const { day, items } of pastByDay) {
       const d = new Date(day + "T12:00:00");
       const label = d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+      // Les heures individuelles sont affichées sur chaque carte
       html += `<div class="day-section">
         <div class="day-label day-past">${label}</div>
         ${items.map(({ match, sheetMatchID, pronos }, i) =>
