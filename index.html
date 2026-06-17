@@ -232,10 +232,10 @@
       color: rgba(255,255,255,0.22);
     }
 
-    /* Cartes passées : grisées + désaturées */
+    /* Cartes passées : très grisées */
     .match-card.card-past {
-      opacity: 0.62;
-      filter: saturate(0.4);
+      opacity: 0.35;
+      filter: saturate(0.2) brightness(0.7);
     }
 
     .match-card {
@@ -373,14 +373,7 @@
       padding: 0.75rem 1.25rem 1rem;
     }
 
-    .pronos-title {
-      font-size: 0.65rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--muted);
-      margin-bottom: 0.6rem;
-    }
+    .pronos-title { display: none; }
 
     .pronos-grid {
       display: grid;
@@ -516,6 +509,49 @@
     .podium-3 .player-name { color: var(--bronze); }
 
     /* ─── LOADING / ERROR ───────────────────────────────────────── */
+    /* ─── TIROIR PRONOSTICS ────────────────────────────────────────── */
+    .pronos-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      padding: 0;
+      background: none;
+      border: none;
+      width: 100%;
+      color: inherit;
+    }
+
+    .pronos-toggle-label {
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: rgba(255,255,255,0.3);
+    }
+
+    .pronos-toggle-icon {
+      font-size: 0.65rem;
+      color: rgba(255,255,255,0.25);
+      transition: transform 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    .pronos-toggle-icon.open { transform: rotate(180deg); }
+
+    .pronos-body {
+      overflow: hidden;
+      max-height: 0;
+      transition: max-height 0.28s ease, opacity 0.2s ease;
+      opacity: 0;
+    }
+
+    .pronos-body.open {
+      max-height: 800px;
+      opacity: 1;
+    }
+
     .state-block {
       display: flex;
       flex-direction: column;
@@ -718,28 +754,32 @@ const REFRESH_INTERVAL = 60_000; // ms
 
 // ── Correspondances noms pays → emoji drapeau ──────────────────
 const FLAG_MAP = {
-  "Argentina":"🇦🇷","Australia":"🇦🇺","Belgium":"🇧🇪","Brazil":"🇧🇷",
-  "Cameroon":"🇨🇲","Canada":"🇨🇦","Chile":"🇨🇱","Colombia":"🇨🇴",
-  "Costa Rica":"🇨🇷","Croatia":"🇭🇷","Denmark":"🇩🇰","Ecuador":"🇪🇨",
-  "England":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","France":"🇫🇷","Germany":"🇩🇪","Ghana":"🇬🇭",
-  "Iran":"🇮🇷","Japan":"🇯🇵","Mexico":"🇲🇽","Morocco":"🇲🇦",
-  "Netherlands":"🇳🇱","Nigeria":"🇳🇬","Poland":"🇵🇱","Portugal":"🇵🇹",
-  "Qatar":"🇶🇦","Saudi Arabia":"🇸🇦","Senegal":"🇸🇳","Serbia":"🇷🇸",
-  "South Korea":"🇰🇷","Spain":"🇪🇸","Switzerland":"🇨🇭","Tunisia":"🇹🇳",
-  "United States":"🇺🇸","Uruguay":"🇺🇾","Wales":"🏴󠁧󠁢󠁷󠁬󠁳󠁿","Ecuador":"🇪🇨",
-  "USA":"🇺🇸","Korea Republic":"🇰🇷","IR Iran":"🇮🇷","Côte d'Ivoire":"🇨🇮",
-  "Ivory Coast":"🇨🇮","Algeria":"🇩🇿","Egypt":"🇪🇬","Mali":"🇲🇱",
-  "Venezuela":"🇻🇪","Paraguay":"🇵🇾","Bolivia":"🇧🇴","Peru":"🇵🇪",
-  "Honduras":"🇭🇳","Panama":"🇵🇦","Jamaica":"🇯🇲","New Zealand":"🇳🇿",
-  "Indonesia":"🇮🇩","Thailand":"🇹🇭","Iraq":"🇮🇶","Türkiye":"🇹🇷",
-  "Turkey":"🇹🇷","Scotland":"🏴󠁧󠁢󠁳󠁣󠁴󠁿","Austria":"🇦🇹","Czech Republic":"🇨🇿",
-  "Slovakia":"🇸🇰","Hungary":"🇭🇺","Slovenia":"🇸🇮","Ukraine":"🇺🇦",
-  "Albania":"🇦🇱","Romania":"🇷🇴","Greece":"🇬🇷","Sweden":"🇸🇪",
-  "Norway":"🇳🇴","Finland":"🇫🇮","Russia":"🇷🇺","China PR":"🇨🇳","China":"🇨🇳",
-  "India":"🇮🇳","Uzbekistan":"🇺🇿","Congo DR":"🇨🇩","Zimbabwe":"🇿🇼",
-  "Zambia":"🇿🇲","Tanzania":"🇹🇿","Rwanda":"🇷🇼","South Africa":"🇿🇦",
-  "Kenya":"🇰🇪","Angola":"🇦🇴","Mozambique":"🇲🇿","Ethiopia":"🇪🇹",
-  "Burkina Faso":"🇧🇫","Guinea":"🇬🇳","Namibia":"🇳🇦","Tanzania":"🇹🇿",
+  // Noms français (utilisés dans le sheet)
+  "France":"🇫🇷","Sénégal":"🇸🇳","Irak":"🇮🇶","Norvège":"🇳🇴",
+  "Argentine":"🇦🇷","Algérie":"🇩🇿","Autriche":"🇦🇹","Jordanie":"🇯🇴",
+  "Portugal":"🇵🇹","RD Congo":"🇨🇩","Ouzbékistan":"🇺🇿","Colombie":"🇨🇴",
+  "Angleterre":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","Croatie":"🇭🇷","Ghana":"🇬🇭","Panama":"🇵🇦",
+  "Mexique":"🇲🇽","Afrique du Sud":"🇿🇦","Corée du Sud":"🇰🇷","Rép. tchèque":"🇨🇿",
+  "Canada":"🇨🇦","Bosnie-Herzégovine":"🇧🇦","Qatar":"🇶🇦","Suisse":"🇨🇭",
+  "Brésil":"🇧🇷","Maroc":"🇲🇦","Haïti":"🇭🇹","Écosse":"🏴󠁧󠁢󠁳󠁣󠁴󠁿",
+  "États-Unis":"🇺🇸","Paraguay":"🇵🇾","Australie":"🇦🇺","Turquie":"🇹🇷",
+  "Allemagne":"🇩🇪","Curaçao":"🇨🇼","Côte d'Ivoire":"🇨🇮","Équateur":"🇪🇨",
+  "Pays-Bas":"🇳🇱","Japon":"🇯🇵","Suède":"🇸🇪","Tunisie":"🇹🇳",
+  "Belgique":"🇧🇪","Égypte":"🇪🇬","Iran":"🇮🇷","Nouvelle-Zélande":"🇳🇿",
+  "Espagne":"🇪🇸","Cap-Vert":"🇨🇻","Arabie Saoudite":"🇸🇦","Uruguay":"🇺🇾",
+  // Noms anglais (fallback API)
+  "France":"🇫🇷","Senegal":"🇸🇳","Iraq":"🇮🇶","Norway":"🇳🇴",
+  "Argentina":"🇦🇷","Algeria":"🇩🇿","Austria":"🇦🇹","Jordan":"🇯🇴",
+  "Portugal":"🇵🇹","Congo DR":"🇨🇩","DR Congo":"🇨🇩","Uzbekistan":"🇺🇿","Colombia":"🇨🇴",
+  "England":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","Croatia":"🇭🇷","Ghana":"🇬🇭","Panama":"🇵🇦",
+  "Mexico":"🇲🇽","South Africa":"🇿🇦","Korea Republic":"🇰🇷","Czech Republic":"🇨🇿",
+  "Canada":"🇨🇦","Bosnia-Herzegovina":"🇧🇦","Qatar":"🇶🇦","Switzerland":"🇨🇭",
+  "Brazil":"🇧🇷","Morocco":"🇲🇦","Haiti":"🇭🇹","Scotland":"🏴󠁧󠁢󠁳󠁣󠁴󠁿",
+  "United States":"🇺🇸","USA":"🇺🇸","Paraguay":"🇵🇾","Australia":"🇦🇺","Turkey":"🇹🇷","Türkiye":"🇹🇷",
+  "Germany":"🇩🇪","Curaçao":"🇨🇼","Curacao":"🇨🇼","Ivory Coast":"🇨🇮","Ecuador":"🇪🇨",
+  "Netherlands":"🇳🇱","Japan":"🇯🇵","Sweden":"🇸🇪","Tunisia":"🇹🇳",
+  "Belgium":"🇧🇪","Egypt":"🇪🇬","Iran":"🇮🇷","New Zealand":"🇳🇿",
+  "Spain":"🇪🇸","Cape Verde Islands":"🇨🇻","Cape Verde":"🇨🇻","Saudi Arabia":"🇸🇦","Uruguay":"🇺🇾",
 };
 
 function getFlag(name) {
@@ -934,6 +974,8 @@ function renderMatchCard(match, matchPronos, matchsSheet, sheetMatchID, i, isPas
   }
 
   // Pronostics section
+  const cardId = `card-${sheetMatchID.replace(/[^a-z0-9]/gi,"-")}`;
+  const isLiveOrDone = realStatus === "FINISHED" || realStatus === "IN_PLAY" || realStatus === "PAUSED";
   let pronosHTML;
   if (!started) {
     pronosHTML = `<p class="hidden-prono">🔒 Pronostics révélés au coup d'envoi</p>`;
@@ -949,7 +991,16 @@ function renderMatchCard(match, matchPronos, matchsSheet, sheetMatchID, i, isPas
           </span>
         </div>`;
     }).join("");
-    pronosHTML = `<div class="pronos-grid">${chips}</div>`;
+    // Tiroir : ouvert par défaut si match en cours ou terminé, fermé si à venir
+    const defaultOpen = isLiveOrDone ? "open" : "";
+    pronosHTML = `
+      <button class="pronos-toggle" onclick="togglePronos('${cardId}')" aria-expanded="${isLiveOrDone}">
+        <span class="pronos-toggle-label">Pronostics (${matchPronos.length})</span>
+        <span class="pronos-toggle-icon${defaultOpen ? " open" : ""}" id="icon-${cardId}">▼</span>
+      </button>
+      <div class="pronos-body${defaultOpen ? " open" : ""}" id="body-${cardId}">
+        <div class="pronos-grid" style="margin-top:0.5rem">${chips}</div>
+      </div>`;
   }
 
   const group = match.group ? `Groupe ${match.group.replace("GROUP_","").replace("_"," ")}` : "Poules";
@@ -1072,6 +1123,16 @@ function renderRanking(matchsSheet, pronosData, apiMatches) {
 function escHtml(s) {
   if (!s) return "";
   return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+// ── Toggle tiroir pronostics ─────────────────────────────────
+function togglePronos(cardId) {
+  const body = document.getElementById("body-" + cardId);
+  const icon = document.getElementById("icon-" + cardId);
+  if (!body) return;
+  const isOpen = body.classList.contains("open");
+  body.classList.toggle("open", !isOpen);
+  if (icon) icon.classList.toggle("open", !isOpen);
 }
 
 // ── Gestion onglets ───────────────────────────────────────────
