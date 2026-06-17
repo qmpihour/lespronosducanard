@@ -1237,17 +1237,22 @@ function renderAll() {
   }
 
   // ── Classe chaque match : today / past ────────────────────
-  const todayStr = now.toISOString().split("T")[0]; // YYYY-MM-DD
+  // Date locale (pas UTC) pour éviter les décalages minuit
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
 
+  // Retourne la date locale YYYY-MM-DD (sans conversion UTC)
   function getMatchDay(m) {
     const d = parseDate(m.match.utcDate);
     if (!d) return null;
-    return d.toISOString().split("T")[0];
+    const y = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, "0");
+    const da = String(d.getDate()).padStart(2, "0");
+    return `${y}-${mo}-${da}`;
   }
 
   const todayMatchs = allMatchs.filter(m => {
     const d = getMatchDay(m);
-    return d === todayStr || d === null; // sans date → aujourd'hui par défaut
+    return d === todayStr || d === null;
   });
 
   const pastMatchs = allMatchs
