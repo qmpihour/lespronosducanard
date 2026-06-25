@@ -1324,10 +1324,27 @@ function renderAll() {
       // Le sheet ne peut déduire FINISHED que si l'API ne connaît pas ce match.
       let status, scoreHome, scoreAway;
       if (apiMatch) {
-        // API trouvée → on prend tout depuis l'API
-        status    = apiMatch.status;
-        scoreHome = apiMatch.score?.fullTime?.home ?? null;
-        scoreAway = apiMatch.score?.fullTime?.away ?? null;
+        // API trouvée → on prend le statut depuis l'API
+        status = apiMatch.status;
+        // IMPORTANT : l'ordre home/away de l'API peut différer de
+        // l'ordre Équipe A / Équipe B du sheet. On vérifie l'alignement
+        // via les noms normalisés avant d'assigner les scores.
+        const apiHomeFr = apiNameToFr(apiMatch.homeTeam.name);
+        const sheetAFr  = normSheet(r["Équipe A"]);
+        const aligned   = apiHomeFr === sheetAFr; // true si home=A, away=B
+
+        const apiHome = apiMatch.score?.fullTime?.home ?? null;
+        const apiAway = apiMatch.score?.fullTime?.away ?? null;
+
+        if (aligned) {
+          scoreHome = apiHome;
+          scoreAway = apiAway;
+        } else {
+          // Ordre inversé : home API = Équipe B du sheet
+          scoreHome = apiAway;
+          scoreAway = apiHome;
+        }
+
         // Si l'API dit FINISHED mais n'a pas encore le score fullTime, fallback sheet
         if (status === "FINISHED" && scoreHome === null && sheetHasScore) {
           scoreHome = parseInt(r["Score A"]);
