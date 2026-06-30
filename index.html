@@ -775,6 +775,7 @@
 const FOOTBALL_API_PROXY_URL = "https://broad-firefly-0619.qmpihour-pro.workers.dev";
 const SHEET_MATCHS_URL  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT7-6Ao0BMuT1OP_HII2trYSIimF5tMaMPq6fEHZQ3_hojeyzGqi-ULjE5zgz3xaXOA_E4PDKcn3TJv/pub?gid=0&single=true&output=csv";
 const SHEET_PRONOS_URL  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT7-6Ao0BMuT1OP_HII2trYSIimF5tMaMPq6fEHZQ3_hojeyzGqi-ULjE5zgz3xaXOA_E4PDKcn3TJv/pub?gid=281674232&single=true&output=csv";
+const SHEET_CLASSEMENT_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vT7-6Ao0BMuT1OP_HII2trYSIimF5tMaMPq6fEHZQ3_hojeyzGqi-ULjE5zgz3xaXOA_E4PDKcn3TJv/pub?gid=1603846857&single=true&output=csv";
 /* ═══════════════════════════════════════════════════════════════ */
 
 const REFRESH_INTERVAL = 60_000; // ms
@@ -884,22 +885,118 @@ async function fetchAPIMatches() {
   }
 }
 
+// ── Parsing d'un pronostic ──────────────────────────────────
+// Formats acceptés :
+//   "2-1"            → score simple (phase de poules ou victoire nette)
+//   "1-1 France"      → nul prévu + vainqueur aux tirs au but
+// Normalise un nom d'équipe pour comparaison (accents, casse)
+// Table de traduction noms API (anglais) → noms sheet (français)
+// Utilisée à la fois pour la résolution des MatchID et pour matcher
+// les noms d'équipes saisis par les joueurs (TAB) quel que soit le format.
+const API_TO_FR = {
+  "senegal":"sénégal","ivory coast":"côte d'ivoire","cape verde islands":"cap-vert",
+  "cape verde":"cap-vert","congo dr":"rd congo","dr congo":"rd congo",
+  "new zealand":"nouvelle-zélande","saudi arabia":"arabie saoudite","sweden":"suède",
+  "tunisia":"tunisie","belgium":"belgique","egypt":"égypte","spain":"espagne",
+  "netherlands":"pays-bas","japan":"japon","germany":"allemagne","ecuador":"équateur",
+  "curacao":"curaçao","australia":"australie","turkey":"turquie","türkiye":"turquie",
+  "scotland":"écosse","norway":"norvège","iraq":"irak","argentina":"argentine",
+  "algeria":"algérie","austria":"autriche","jordan":"jordanie","england":"angleterre",
+  "croatia":"croatie","colombia":"colombie","uzbekistan":"ouzbékistan",
+  "czech republic":"rép. tchèque","czechia":"rép. tchèque",
+  "south africa":"afrique du sud","switzerland":"suisse",
+  "bosnia-herzegovina":"bosnie-herzégovine","bosnia and herzegovina":"bosnie-herzégovine",
+  "mexico":"mexique","korea republic":"corée du sud","south korea":"corée du sud",
+  "usa":"états-unis","united states":"états-unis","brazil":"brésil","morocco":"maroc",
+  "haiti":"haïti","iran":"iran","portugal":"portugal","ghana":"ghana","panama":"panama",
+  "paraguay":"paraguay","uruguay":"uruguay","canada":"canada","qatar":"qatar","france":"france",
+};
+
+// Normalise un nom d'équipe en passant par la table de traduction
+// ci-dessus, pour gérer les variantes français/anglais
+// (ex: "Argentina" et "Argentine" doivent matcher la même équipe).
+function normTeamName(s) {
+  const brut = (s || "").trim().toLowerCase();
+  const sansAccent = brut.normalize("NFD").replace(/[̀-ͯ]/g, "");
+  // Tente une traduction anglais→français via la table existante
+  const traduit = (typeof API_TO_FR !== "undefined" && (API_TO_FR[brut] || API_TO_FR[sansAccent])) || sansAccent;
+  return traduit.normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+
 // ── Calcul résultat d'un pronostic ────────────────────────────
-function computeResult(pronoStr, scoreA, scoreB, status) {
+// match : objet avec { scoreA, scoreB, status, isKnockout, teamA, teamB,
+//                       extraTime: {scoreA,scoreB}|null, penalties: {scoreA,scoreB,winner}|null }
+// Pour la phase de poules (isKnockout=false), comportement inchangé (max 2pts).
+// Pour l'élimination directe (isKnockout=true), max 4pts :
+//   - 2pts si le score final (90' ou prolongations) est exact
+//   - 1pt si le bon vainqueur (ou bon nul) est trouvé sans score exact
+//   - +2pts bonus si le match s'est joué aux TAB et que le bon vainqueur TAB est pronostiqué
+function computeResult(pronoStr, scoreA, scoreB, status, opts) {
+  opts = opts || {};
   if (status !== "FINISHED" && status !== "IN_PLAY" && status !== "PAUSED") return null;
   if (scoreA === null || scoreB === null) return null;
-  const parts = pronoStr.split("-");
-  if (parts.length !== 2) return null;
-  const pA = parseInt(parts[0]), pB = parseInt(parts[1]);
-  if (isNaN(pA) || isNaN(pB)) return null;
 
-  if (pA === scoreA && pB === scoreB) return { pts: 2, icon: "✅", label: "2pts" };
+  const parsed = parsePrano(pronoStr);
+  if (!parsed) return null;
+  const { scoreA: pA, scoreB: pB, tabWinner } = parsed;
 
-  const realWinner = scoreA > scoreB ? "A" : scoreB > scoreA ? "B" : "N";
-  const pronoWinner = pA > pB ? "A" : pB > pA ? "B" : "N";
-  if (realWinner === pronoWinner) return { pts: 1, icon: "🟡", label: "1pt" };
+  // ── Phase de poules : comportement classique, max 2pts ──────
+  if (!opts.isKnockout) {
+    if (pA === scoreA && pB === scoreB) return { pts: 2, icon: "✅", label: "2pts" };
+    const realWinner = scoreA > scoreB ? "A" : scoreB > scoreA ? "B" : "N";
+    const pronoWinner = pA > pB ? "A" : pB > pA ? "B" : "N";
+    if (realWinner === pronoWinner) return { pts: 1, icon: "🟡", label: "1pt" };
+    return { pts: 0, icon: "❌", label: "0pt" };
+  }
 
-  return { pts: 0, icon: "❌", label: "0pt" };
+  // ── Élimination directe : score (90' ou prolongations) + bonus TAB ──
+  let pts = 0;
+  const parts = [];
+
+  if (pA === scoreA && pB === scoreB) {
+    pts += 2;
+    parts.push("score exact (2pts)");
+  } else {
+    const realWinner = scoreA > scoreB ? "A" : scoreB > scoreA ? "B" : "N";
+    const pronoWinner = pA > pB ? "A" : pB > pA ? "B" : "N";
+    if (realWinner === pronoWinner) {
+      pts += 1;
+      parts.push("bon résultat (1pt)");
+    }
+  }
+
+  // Bonus TAB : uniquement si le match s'est réellement joué aux tirs au but
+  if (opts.penaltiesWinner && tabWinner) {
+    const guessNorm = normTeamName(tabWinner);
+    const teamANorm = normTeamName(opts.teamA);
+    const teamBNorm = normTeamName(opts.teamB);
+    const realTabWinnerNorm = normTeamName(opts.penaltiesWinner);
+    // Tolère un nom complet, partiel, en français ou en anglais
+    // (normTeamName traduit déjà via API_TO_FR avant comparaison)
+    const guessedA = guessNorm.length >= 3 && (teamANorm.includes(guessNorm) || guessNorm.includes(teamANorm));
+    const guessedB = guessNorm.length >= 3 && (teamBNorm.includes(guessNorm) || guessNorm.includes(teamBNorm));
+    const guessedTeam = guessedA && !guessedB ? opts.teamA
+                       : guessedB && !guessedA ? opts.teamB
+                       : null; // ambiguïté = pas de point accordé
+    if (guessedTeam && normTeamName(guessedTeam) === realTabWinnerNorm) {
+      pts += 2;
+      parts.push("TAB (2pts)");
+    }
+  }
+
+  if (pts === 0) return { pts: 0, icon: "❌", label: "0pt" };
+  const icon = pts >= 4 ? "✅" : pts >= 2 ? "✅" : "🟡";
+  return { pts, icon, label: `${pts}pts (${parts.join(" + ")})` };
+}
+
+function parsePrano(pronoStr) {
+  if (!pronoStr) return null;
+  const trimmed = String(pronoStr).trim();
+  const m = trimmed.match(/^(\d+)\s*-\s*(\d+)\s*(.+)?$/);
+  if (!m) return null;
+  const scoreA = parseInt(m[1]), scoreB = parseInt(m[2]);
+  if (isNaN(scoreA) || isNaN(scoreB)) return null;
+  return { scoreA, scoreB, tabWinner: m[3] ? m[3].trim() : null };
 }
 
 // ── Formatage heure locale ─────────────────────────────────────
@@ -964,8 +1061,24 @@ function renderMatchCard(match, matchPronos, matchsSheet, sheetMatchID, i, isPas
   const teamB = awayTeam.name;
   const flagA = getFlag(teamA);
   const flagB = getFlag(teamB);
-  const scoreA = score?.fullTime?.home ?? score?.regularTime?.home ?? null;
-  const scoreB = score?.fullTime?.away ?? score?.regularTime?.away ?? null;
+
+  // Score final : priorité prolongations > temps réglementaire
+  // (football-data.org renvoie score.fullTime pour le score à 90',
+  //  score.extraTime si prolongations jouées, score.penalties si TAB)
+  const scoreA = score?.extraTime?.home ?? score?.fullTime?.home ?? score?.regularTime?.home ?? null;
+  const scoreB = score?.extraTime?.away ?? score?.fullTime?.away ?? score?.regularTime?.away ?? null;
+
+  // Vainqueur aux tirs au but (si applicable)
+  const penA = score?.penalties?.home ?? null;
+  const penB = score?.penalties?.away ?? null;
+  let penaltiesWinner = null;
+  if (penA !== null && penB !== null) {
+    penaltiesWinner = penA > penB ? teamA : penB > penA ? teamB : null;
+  }
+
+  // Match d'élimination directe : MatchID commençant par "M" suivi de chiffres
+  // (ex: M73-M104), distinct des matchs de poules "GRP_X_Y"
+  const isKnockout = /^M\d+$/.test(sheetMatchID);
 
   // Score dans le sheet (fallback si l'API n'a pas encore le score)
   const sheetRow = matchsSheet.find(r => r.MatchID === sheetMatchID);
@@ -984,7 +1097,10 @@ function renderMatchCard(match, matchPronos, matchsSheet, sheetMatchID, i, isPas
 
   // Statut badge
   let statusLabel, statusClass;
-  if (realStatus === "FINISHED") { statusLabel = "Terminé"; statusClass = "status-finished"; }
+  if (realStatus === "FINISHED") {
+    statusLabel = penaltiesWinner ? `Terminé (TAB)` : "Terminé";
+    statusClass = "status-finished";
+  }
   else if (realStatus === "IN_PLAY" || realStatus === "PAUSED") { statusLabel = "🔴 En cours"; statusClass = "status-live"; }
   else { statusLabel = `⏰ ${formatTime(utcDate)}`; statusClass = "status-upcoming"; }
 
@@ -993,6 +1109,7 @@ function renderMatchCard(match, matchPronos, matchsSheet, sheetMatchID, i, isPas
   if (realStatus === "FINISHED" || realStatus === "IN_PLAY" || realStatus === "PAUSED") {
     scoreHTML = `<div class="score-digits">${realScoreA ?? "?"}<span class="score-sep"> - </span>${realScoreB ?? "?"}</div>`;
     if (realStatus !== "FINISHED") scoreHTML += `<div class="score-time">Live</div>`;
+    else if (penaltiesWinner) scoreHTML += `<div class="score-time">TAB : ${escHtml(penaltiesWinner)} qualifié(e)</div>`;
   } else {
     // Avant le match : 0 - 0 grisé + heure de coup d'envoi
     const timeStr = formatTime(utcDate);
@@ -1008,7 +1125,9 @@ function renderMatchCard(match, matchPronos, matchsSheet, sheetMatchID, i, isPas
     pronosHTML = `<p class="hidden-prono">🔒 Pronostics révélés au coup d'envoi</p>`;
   } else {
     const chips = matchPronos.map(p => {
-      const res = computeResult(p.prono, realScoreA, realScoreB, realStatus);
+      const res = computeResult(p.prono, realScoreA, realScoreB, realStatus, {
+        isKnockout, teamA, teamB, penaltiesWinner
+      });
       return `
         <div class="prono-chip">
           <span class="prono-name">${escHtml(p.joueur)}</span>
@@ -1065,78 +1184,59 @@ function renderMatchCard(match, matchPronos, matchsSheet, sheetMatchID, i, isPas
 
 // ── Rendu classement ──────────────────────────────────────────
 // pronosData : { joueurs: string[], byMatchID: Map<string, {joueur, prono}[]> }
-function renderRanking(matchsSheet, pronosData, apiMatches) {
-  const scores = {};
+// ── Classement : lu directement depuis l'onglet "Classement" ───
+// Le calcul des points est fait côté Apps Script (majClassement),
+// ce qui permet une correction manuelle facile en cas de besoin,
+// sans avoir à toucher au code du site.
+let classementCache = null;
 
-  // Initialise tous les joueurs connus (même ceux à 0 pt)
-  for (const j of pronosData.joueurs) {
-    scores[j] = { pts: 0, played: 0, exact: 0, good: 0 };
+async function fetchClassement() {
+  try {
+    const rows = await fetchCSV(SHEET_CLASSEMENT_URL);
+    return rows;
+  } catch(e) {
+    dbg(`Classement inaccessible (${e.message})`);
+    return null;
   }
+}
 
-  // Rassemble tous les matchs terminés avec leurs scores
-  const finishedMatches = new Map(); // mid → {sA, sB}
-  for (const m of apiMatches) {
-    if (m.status !== "FINISHED") continue;
-    const sA = m.score?.fullTime?.home ?? null;
-    const sB = m.score?.fullTime?.away ?? null;
-    if (sA === null) continue;
-    const mid = resolveSheetMatchID(m, matchsSheet);
-    finishedMatches.set(mid, { sA, sB });
-    // aussi indexer par id API brut
-    finishedMatches.set(String(m.id), { sA, sB });
-  }
-
-  // Scores manuels du sheet Matchs
-  for (const r of matchsSheet) {
-    const sA = r["Score A"] !== undefined && r["Score A"] !== "" ? parseInt(r["Score A"]) : null;
-    const sB = r["Score B"] !== undefined && r["Score B"] !== "" ? parseInt(r["Score B"]) : null;
-    if (sA === null || sB === null || !r.MatchID) continue;
-    if (!finishedMatches.has(r.MatchID)) finishedMatches.set(r.MatchID, { sA, sB });
-  }
-
-  // Calcul des points depuis les pronostics (format large)
-  for (const [mid, pronos] of pronosData.byMatchID) {
-    const fm = finishedMatches.get(mid);
-    if (!fm) continue;
-    for (const { joueur, prono } of pronos) {
-      if (!scores[joueur]) scores[joueur] = { pts: 0, played: 0, exact: 0, good: 0 };
-      const res = computeResult(prono, fm.sA, fm.sB, "FINISHED");
-      if (!res) continue;
-      scores[joueur].played++;
-      scores[joueur].pts += res.pts;
-      if (res.pts === 2) scores[joueur].exact++;
-      if (res.pts === 1) scores[joueur].good++;
-    }
-  }
-
-  const sorted = Object.entries(scores).sort((a, b) =>
-    b[1].pts - a[1].pts || b[1].exact - a[1].exact || b[1].good - a[1].good
-  );
-
-  if (sorted.length === 0) {
-    return `<div class="state-block"><div class="state-icon">📊</div><p>Aucun joueur détecté dans le Google Sheets.</p></div>`;
+function renderRankingFromSheet(rows) {
+  if (!rows || rows.length === 0) {
+    return `<div class="state-block"><div class="state-icon">📊</div><p>Classement indisponible — vérifiez que l'onglet "Classement" est bien publié et à jour.</p></div>`;
   }
 
   const medals = ["🥇","🥈","🥉"];
   const podiumClass = ["podium-1","podium-2","podium-3"];
 
-  // Calcul des rangs — ex-æquo basés uniquement sur les pts
-  // Tous ceux qui ont le même nombre de pts partagent le même rang
-  const uniquePts = [...new Set(sorted.map(([,s]) => s.pts))].sort((a,b) => b-a);
+  // Les colonnes du sheet Classement : Rang | Joueur | Points | Matchs joués | Exacts/TAB | Bons résultats
+  const sorted = rows
+    .filter(r => r["Joueur"] && r["Joueur"].trim())
+    .map(r => ({
+      name: r["Joueur"],
+      pts: parseInt(r["Points"]) || 0,
+      played: parseInt(r["Matchs joués"]) || 0,
+      exact: parseInt(r["Exacts/TAB"]) || 0,
+      good: parseInt(r["Bons résultats"]) || 0,
+    }))
+    .sort((a, b) => b.pts - a.pts || b.exact - a.exact || b.good - a.good);
 
-  const rows = sorted.map(([name, s], idx) => {
-    const rank = uniquePts.indexOf(s.pts) + 1; // rang selon pts uniquement
+  if (sorted.length === 0) {
+    return `<div class="state-block"><div class="state-icon">📊</div><p>Aucun joueur détecté dans le classement.</p></div>`;
+  }
+
+  // Ex-æquo basés uniquement sur les points (cohérent avec le script Apps Script)
+  const uniquePts = [...new Set(sorted.map(s => s.pts))].sort((a, b) => b - a);
+
+  const tableRows = sorted.map((s, idx) => {
+    const rank = uniquePts.indexOf(s.pts) + 1;
     const medal = rank <= 3 ? medals[rank - 1] : null;
     const pc = rank <= 3 ? podiumClass[rank - 1] : "";
-    // Rang numérique = position réelle dans le classement (pour les non-médaillés)
-    const numRank = sorted.slice(0, idx).filter(([,os]) => os.pts > s.pts).length + 1;
-    const rankCell = medal
-      ? medal
-      : `<span class="rank-number">${numRank}</span>`;
+    const numRank = sorted.slice(0, idx).filter(os => os.pts > s.pts).length + 1;
+    const rankCell = medal ? medal : `<span class="rank-number">${numRank}</span>`;
     return `
       <tr class="${pc}">
         <td class="rank-cell">${rankCell}</td>
-        <td class="player-name">${escHtml(name)}</td>
+        <td class="player-name">${escHtml(s.name)}</td>
         <td class="pts-cell">${s.pts}</td>
         <td class="stat-cell">${s.played}</td>
         <td class="stat-cell">${s.exact}</td>
@@ -1156,7 +1256,7 @@ function renderRanking(matchsSheet, pronosData, apiMatches) {
           <th>Bons</th>
         </tr>
       </thead>
-      <tbody>${rows}</tbody>
+      <tbody>${tableRows}</tbody>
     </table>`;
 }
 
@@ -1275,7 +1375,7 @@ async function loadAll() {
     }
     // ─────────────────────────────────────────────────────────
 
-    renderAll();
+    await renderAll();
 
     const ts = new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
     document.getElementById("last-update").textContent = `Dernière mise à jour : ${ts}`;
@@ -1286,7 +1386,7 @@ async function loadAll() {
   }
 }
 
-function renderAll() {
+async function renderAll() {
   const matchsContainer = document.getElementById("matchs-container");
   const now = new Date();
 
@@ -1381,7 +1481,8 @@ function renderAll() {
 
   if (allMatchs.length === 0) {
     matchsContainer.innerHTML = `<div class="state-block"><div class="state-icon">📅</div><p>Aucun pronostic saisi dans le Google Sheets.</p></div>`;
-    document.getElementById("ranking-container").innerHTML = renderRanking(matchsSheet, pronosData, apiMatches);
+    const classementRows = await fetchClassement();
+    document.getElementById("ranking-container").innerHTML = renderRankingFromSheet(classementRows);
     return;
   }
 
@@ -1469,32 +1570,12 @@ function renderAll() {
 
   matchsContainer.innerHTML = html;
 
-  // ── Classement ──
-  document.getElementById("ranking-container").innerHTML =
-    renderRanking(matchsSheet, pronosData, apiMatches);
+  // ── Classement (lu depuis l'onglet "Classement" du sheet) ──
+  const classementRows = await fetchClassement();
+  document.getElementById("ranking-container").innerHTML = renderRankingFromSheet(classementRows);
 }
 
 // ── Résolution du MatchID sheet depuis un objet match API ──────
-// Utilise la même table de normalisation que le script Apps Script
-const API_TO_FR = {
-  "senegal":"sénégal","ivory coast":"côte d'ivoire","cape verde islands":"cap-vert",
-  "cape verde":"cap-vert","congo dr":"rd congo","dr congo":"rd congo",
-  "new zealand":"nouvelle-zélande","saudi arabia":"arabie saoudite","sweden":"suède",
-  "tunisia":"tunisie","belgium":"belgique","egypt":"égypte","spain":"espagne",
-  "netherlands":"pays-bas","japan":"japon","germany":"allemagne","ecuador":"équateur",
-  "curacao":"curaçao","australia":"australie","turkey":"turquie","türkiye":"turquie",
-  "scotland":"écosse","norway":"norvège","iraq":"irak","argentina":"argentine",
-  "algeria":"algérie","austria":"autriche","jordan":"jordanie","england":"angleterre",
-  "croatia":"croatie","colombia":"colombie","uzbekistan":"ouzbékistan",
-  "czech republic":"rép. tchèque","czechia":"rép. tchèque",
-  "south africa":"afrique du sud","switzerland":"suisse",
-  "bosnia-herzegovina":"bosnie-herzégovine","bosnia and herzegovina":"bosnie-herzégovine",
-  "mexico":"mexique","korea republic":"corée du sud","south korea":"corée du sud",
-  "usa":"états-unis","united states":"états-unis","brazil":"brésil","morocco":"maroc",
-  "haiti":"haïti","iran":"iran","portugal":"portugal","ghana":"ghana","panama":"panama",
-  "paraguay":"paraguay","uruguay":"uruguay","canada":"canada","qatar":"qatar","france":"france",
-};
-
 function apiNameToFr(name) {
   const brut = name.trim().toLowerCase();
   const sansAccent = brut.normalize("NFD").replace(/[̀-ͯ]/g,"");
