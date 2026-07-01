@@ -837,10 +837,14 @@ function parseCSV(text) {
 // ── Fetch CSV — direct d'abord, proxies en fallback ──────────
 // Google Sheets CSV publiés autorisent le CORS nativement.
 async function fetchCSV(url) {
+  // Timeout généreux (20s) + 4 proxies en cascade pour absorber
+  // les lenteurs intermittentes de Google Sheets CSV
+  const T = 20000;
   const attempts = [
-    () => fetch(url, { signal: AbortSignal.timeout(8000) }),
-    () => fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(8000) }),
-    () => fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(8000) }),
+    () => fetch(url, { signal: AbortSignal.timeout(T) }),
+    () => fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(T) }),
+    () => fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(T) }),
+    () => fetch(`https://thingproxy.freeboard.io/fetch/${url}`, { signal: AbortSignal.timeout(T) }),
   ];
   let lastErr;
   for (const attempt of attempts) {
@@ -850,7 +854,7 @@ async function fetchCSV(url) {
       const text = await res.text();
       if (!text.trim()) throw new Error("Réponse vide");
       return parseCSV(text);
-    } catch(e) { lastErr = e; }
+    } catch(e) { lastErr = e; dbg(`Proxy échoué : ${e.message}`); }
   }
   throw lastErr;
 }
