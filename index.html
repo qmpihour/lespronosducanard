@@ -854,7 +854,7 @@ async function fetchCSV(url) {
       const text = await res.text();
       if (!text.trim()) throw new Error("Réponse vide");
       return parseCSV(text);
-    } catch(e) { lastErr = e; dbg(`Proxy échoué : ${e.message}`); }
+    } catch(e) { lastErr = e; }
   }
   throw lastErr;
 }
